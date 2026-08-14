@@ -6,6 +6,12 @@
 
 # To list all registered routes, run the following command:
 #   bin/console debug:router
+# yaml-language-server: $schema=../vendor/symfony/routing/Loader/schema/routing.schema.json
 
-controllers:
-    resource: routing.controllers
+restaurant_index:
+    path: /restaurant
+    controller: App\Controller\RestaurantController::index
+
+restaurant_home:
+    path: /
+    controller: App\Controller\DefaultController::home
