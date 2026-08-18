@@ -7,7 +7,7 @@ use App\Repository\RestaurantRepository;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\{JsonResponse, Request, Response};
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/api/restaurant', name: 'app_api_restaurant_')]
@@ -16,25 +16,38 @@ class RestaurantController extends AbstractController
     public function __construct(private EntityManagerInterface $manager, private RestaurantRepository $repository)
     {
     }
-
+           
     #[Route(methods: 'POST')]
-    public function new(): Response
+    public function new(Request $request): JsonResponse
+
     {
-        $restaurant = new Restaurant();
-        $restaurant->setName('Quai Antique');
-        $restaurant->setDescription('Cette qualité et ce goût par le chef Arnaud MICHANT.');
+
+        $restaurant = $this->serializer->deserialize($request->getContent(), Restaurant::class, 'json');
+
         $restaurant->setCreatedAt(new DateTimeImmutable());
 
-        // Tell Doctrine you want to (eventually) save the restaurant (no queries yet)
         $this->manager->persist($restaurant);
-        // Actually executes the queries (i.e. the INSERT query)
+
         $this->manager->flush();
 
-        return $this->json(
-            ['message' => "Restaurant resource created with {$restaurant->getId()} id"],
-            Response::HTTP_CREATED,
+        $responseData = $this->serializer->serialize($restaurant, 'json');
+
+        $location = $this->urlGenerator->generate(
+
+            'app_api_restaurant_show',
+
+            ['id' => $restaurant->getId()],
+
+            UrlGeneratorInterface::ABSOLUTE_URL,
+
         );
-    } 
+
+        return new JsonResponse($responseData, Response::HTTP_CREATED, ["Location" => $location], true);
+
+    //…
+
+}
+    
 
     #[Route('/{id}', name: 'show', methods: 'GET')]
     public function show(int $id): Response
