@@ -23,4 +23,10 @@ class UserTest extends TestCase
 
         $this->assertSame($email, $user->getEmail());
     }
+
+    public function testTheAutomaticApiTokenSettingWhenAnUserIsCreated(): void
+    {
+        $user = new User();
+        $this->assertNotNull($user->getApiToken());
+    }
 }
