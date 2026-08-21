@@ -11,11 +11,15 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\{JsonResponse, Request, Response};
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Serializer\SerializerInterface;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 #[Route('/api/restaurant', name: 'app_api_restaurant_')]
 class RestaurantController extends AbstractController
 {
-    public function __construct(private EntityManagerInterface $manager, private RestaurantRepository $repository)
+    public function __construct(private EntityManagerInterface $manager, 
+    private RestaurantRepository $repository, 
+    private SerializerInterface $serializer,
+    private UrlGeneratorInterface $urlGenerator,)
     {
     }
            
@@ -81,8 +85,6 @@ class RestaurantController extends AbstractController
 
         return new JsonResponse($responseData, Response::HTTP_CREATED, ["Location" => $location], true);
 
-    //…
-
 }
     
 
@@ -119,6 +121,7 @@ class RestaurantController extends AbstractController
                 )
             ]
         )]
+
     public function show(int $id): Response
     {
         $restaurant = $this->repository->findOneBy(['id' => $id]);
@@ -133,6 +136,41 @@ class RestaurantController extends AbstractController
     } 
 
     #[Route('/{id}', name: 'edit', methods: 'PUT')]
+     #[OA\Put(
+            path: '/api/restaurant/{id}',
+            summary: 'Modifier un Restaurant par ID',
+            requestBody: new OA\RequestBody(
+                required: true,
+                description: "Données du Restaurant à modifier",
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'name', type: 'string', example: 'Nom du restaurant'),
+                        new OA\Property(property: 'description', type: 'string', example: 'Description du restaurant'),
+                    ]
+                )
+            ),
+            responses: [
+                new OA\Response(
+                    response: 200,
+                    description: 'Restaurant modifié avec succès',
+                    content: new OA\JsonContent(
+                        type: 'object',
+                        properties: [
+                            new OA\Property(property: 'id', type: 'integer', example: 1),
+                            new OA\Property(property: 'name', type: 'string', example: 'Nom du restaurant'),
+                            new OA\Property(property: 'description', type: 'string', example: 'Description du restaurant'),
+                            new OA\Property(property: 'udatedAt', type: 'string', format: 'date-time'),
+                        ]
+                    )
+                ),
+                new OA\Response(
+                    response: 404,
+                    description: 'Restaurant non trouvé'
+                )
+            ]
+        )]
+
     public function edit(int $id): Response
     {
         $restaurant = $this->repository->findOneBy(['id' => $id]);
@@ -148,6 +186,33 @@ class RestaurantController extends AbstractController
     }
 
     #[Route('/{id}', name: 'delete', methods: 'DELETE')]
+    #[OA\Delete(
+            path: '/api/restaurant/{id}',
+            summary: 'Supprimer un Restaurant par ID',
+            requestBody: new OA\RequestBody(
+                required: false,
+                description: "Restaurant à supprimer",
+            ),
+            responses: [
+                new OA\Response(
+                    response: 200,
+                    description: 'Restaurant supprimé avec succès',
+                    content: new OA\JsonContent(
+                        type: 'object',
+                        properties: [
+                            new OA\Property(property: 'id', type: 'integer', example: 1),
+                            new OA\Property(property: 'name', type: 'string', example: 'Nom du restaurant'),
+                            new OA\Property(property: 'description', type: 'string', example: 'Description du restaurant'),
+                        ]
+                    )
+                ),
+                new OA\Response(
+                    response: 404,
+                    description: 'Restaurant non trouvé'
+                )
+            ]
+        )]
+
     public function delete(int $id): Response
     {
         $restaurant = $this->repository->findOneBy(['id' => $id]);
@@ -160,6 +225,5 @@ class RestaurantController extends AbstractController
 
         return $this->json(['message' => "Restaurant resource deleted"], Response::HTTP_NO_CONTENT);
     }
-// …
-   
 }
+
