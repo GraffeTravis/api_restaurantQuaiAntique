@@ -4,14 +4,23 @@ namespace App\Tests\Entity;
 
 use App\Entity\User;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class UserTest extends TestCase
 {
-    public function testAnException(): void
+    public static function provideEmail(): \Generator
     {
-        $this->expectException(\TypeError::class);
+        yield ['Thomas@test.com'];
+        yield ['Eric@test.com'];
+        yield ['Marie@test.com'];
+    }
 
+    #[DataProvider('provideEmail')]
+    public function testEmailSetter(string $email): void
+    {
         $user = new User();
-        $user->setFirstName([10]);
+        $user->setEmail($email);
+
+        $this->assertSame($email, $user->getEmail());
     }
 }
