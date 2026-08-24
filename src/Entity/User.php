@@ -40,6 +40,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 255)]
     private ?string $apiToken;
 
+    #[ORM\Column(length: 64)]
+    private ?string $FirstName = null;
+
+    #[ORM\Column(length: 64)]
+    private ?string $LastName = null;
+
     public function __construct()
     {
         $this->apiToken = bin2hex(random_bytes(20));
@@ -152,6 +158,30 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setApiToken(string $apiToken): static
     {
         $this->apiToken = $apiToken;
+
+        return $this;
+    }
+
+    public function getFirstName(): ?string
+    {
+        return $this->FirstName;
+    }
+
+    public function setFirstName(string $FirstName): static
+    {
+        $this->FirstName = $FirstName;
+
+        return $this;
+    }
+
+    public function getLastName(): ?string
+    {
+        return $this->LastName;
+    }
+
+    public function setLastName(string $LastName): static
+    {
+        $this->LastName = $LastName;
 
         return $this;
     }
