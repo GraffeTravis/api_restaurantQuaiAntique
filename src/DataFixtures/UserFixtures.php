@@ -22,7 +22,6 @@ class UserFixtures extends Fixture
             $user = (new User())
                 ->setFirstName("Firstname $i")
                 ->setLastName("Lastname $i")
-                ->setGuestNumber(random_int(0,5))
                 ->setEmail("email.$i@studi.fr")
                 ->setCreatedAt(new DateTimeImmutable());
 
