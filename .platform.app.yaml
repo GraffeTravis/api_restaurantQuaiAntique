@@ -26,7 +26,6 @@ web:
     locations:
         "/":
             root: "public"
-            expires: 1h
             passthru: "/index.php"
 
 mounts:
