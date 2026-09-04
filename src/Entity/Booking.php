@@ -32,6 +32,14 @@ class Booking
     #[ORM\Column(nullable: true)]
     private ?\DateTime $updatedAt = null;
 
+    #[ORM\ManyToOne(inversedBy: 'bookings')]
+    #[ORM\JoinColumn(nullable: false)]
+    private ?Restaurant $Restaurant = null;
+
+    #[ORM\ManyToOne(inversedBy: 'bookings')]
+    #[ORM\JoinColumn(nullable: false)]
+    private ?User $client = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -112,6 +120,30 @@ class Booking
     public function setUpdatedAt(?\DateTime $updatedAt): static
     {
         $this->updatedAt = $updatedAt;
+
+        return $this;
+    }
+
+    public function getRestaurant(): ?Restaurant
+    {
+        return $this->Restaurant;
+    }
+
+    public function setRestaurant(?Restaurant $Restaurant): static
+    {
+        $this->Restaurant = $Restaurant;
+
+        return $this;
+    }
+
+    public function getClient(): ?User
+    {
+        return $this->client;
+    }
+
+    public function setClient(?User $client): static
+    {
+        $this->client = $client;
 
         return $this;
     }

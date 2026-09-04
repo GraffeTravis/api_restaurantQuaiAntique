@@ -47,6 +47,12 @@ class Restaurant
     #[ORM\JoinColumn(name: 'Owner', referencedColumnName: 'id', nullable: false)]
     private ?User $owner = null;
 
+    /**
+     * @var Collection<int, Booking>
+     */
+    #[ORM\OneToMany(targetEntity: Booking::class, mappedBy: 'Restaurant', orphanRemoval: true)]
+    private Collection $bookings;
+
     public function getOwner(): ?User
     {
         return $this->owner;
@@ -62,6 +68,7 @@ class Restaurant
     public function __construct()
     {
         $this->pictures = new ArrayCollection();
+        $this->bookings = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -179,6 +186,36 @@ class Restaurant
     public function setMaxGuest(int $maxGuest): static
     {
         $this->maxGuest = $maxGuest;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Booking>
+     */
+    public function getBookings(): Collection
+    {
+        return $this->bookings;
+    }
+
+    public function addBooking(Booking $booking): static
+    {
+        if (!$this->bookings->contains($booking)) {
+            $this->bookings->add($booking);
+            $booking->setRestaurant($this);
+        }
+
+        return $this;
+    }
+
+    public function removeBooking(Booking $booking): static
+    {
+        if ($this->bookings->removeElement($booking)) {
+            // set the owning side to null (unless already changed)
+            if ($booking->getRestaurant() === $this) {
+                $booking->setRestaurant(null);
+            }
+        }
 
         return $this;
     }
