@@ -42,10 +42,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $apiToken;
 
     #[ORM\Column(length: 64)]
-    private ?string $FirstName = null;
+    private ?string $firstName = null;
 
     #[ORM\Column(length: 64)]
-    private ?string $LastName = null;
+    private ?string $lastName = null;
 
     #[ORM\Column(type: Types::SMALLINT, nullable: true)]
     private ?int $guestNumber = null;
@@ -169,26 +169,26 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getFirstName(): ?string
+    public function getfirstName(): ?string
     {
-        return $this->FirstName;
+        return $this->firstName;
     }
 
-    public function setFirstName(string $FirstName): static
+    public function setfirstName(string $firstName): static
     {
-        $this->FirstName = $FirstName;
+        $this->firstName = $firstName;
 
         return $this;
     }
 
-    public function getLastName(): ?string
+    public function getlastName(): ?string
     {
-        return $this->LastName;
+        return $this->lastName;
     }
 
-    public function setLastName(string $LastName): static
+    public function setlastName(string $lastName): static
     {
-        $this->LastName = $LastName;
+        $this->lastName = $lastName;
 
         return $this;
     }
