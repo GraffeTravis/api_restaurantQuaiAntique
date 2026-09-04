@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Repository\UserRepository;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -45,6 +46,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 64)]
     private ?string $LastName = null;
+
+    #[ORM\Column(type: Types::SMALLINT, nullable: true)]
+    private ?int $guestNumber = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $allergy = null;
 
     public function __construct()
     {
@@ -182,6 +189,30 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setLastName(string $LastName): static
     {
         $this->LastName = $LastName;
+
+        return $this;
+    }
+
+    public function getGuestNumber(): ?int
+    {
+        return $this->guestNumber;
+    }
+
+    public function setGuestNumber(?int $guestNumber): static
+    {
+        $this->guestNumber = $guestNumber;
+
+        return $this;
+    }
+
+    public function getAllergy(): ?string
+    {
+        return $this->allergy;
+    }
+
+    public function setAllergy(?string $allergy): static
+    {
+        $this->allergy = $allergy;
 
         return $this;
     }

@@ -40,6 +40,12 @@ class Restaurant
     #[ORM\OneToMany(targetEntity: Picture::class, mappedBy: 'restaurant', orphanRemoval: true)]
     private Collection $pictures;
 
+    #[ORM\Column(type: Types::SMALLINT)]
+    private ?int $maxGuest = null;
+
+    #[ORM\Column]
+    private ?int $Owner = null;
+
     public function __construct()
     {
         $this->pictures = new ArrayCollection();
@@ -148,6 +154,30 @@ class Restaurant
                 $picture->setRestaurant(null);
             }
         }
+
+        return $this;
+    }
+
+    public function getMaxGuest(): ?int
+    {
+        return $this->maxGuest;
+    }
+
+    public function setMaxGuest(int $maxGuest): static
+    {
+        $this->maxGuest = $maxGuest;
+
+        return $this;
+    }
+
+    public function getOwner(): ?int
+    {
+        return $this->Owner;
+    }
+
+    public function setOwner(int $Owner): static
+    {
+        $this->Owner = $Owner;
 
         return $this;
     }
