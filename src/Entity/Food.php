@@ -3,6 +3,8 @@
 namespace App\Entity;
 
 use App\Repository\FoodRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -28,6 +30,17 @@ class Food
 
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $updatedAt = null;
+
+    /**
+     * @var Collection<int, FoodCategory>
+     */
+    #[ORM\OneToMany(targetEntity: FoodCategory::class, mappedBy: 'foodId', orphanRemoval: true)]
+    private Collection $foodCategories;
+
+    public function __construct()
+    {
+        $this->foodCategories = new ArrayCollection();
+    }
 
     public function getId(): ?int
     {
@@ -90,6 +103,36 @@ class Food
     public function setUpdatedAt(?\DateTimeImmutable $updatedAt): static
     {
         $this->updatedAt = $updatedAt;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, FoodCategory>
+     */
+    public function getFoodCategories(): Collection
+    {
+        return $this->foodCategories;
+    }
+
+    public function addFoodCategory(FoodCategory $foodCategory): static
+    {
+        if (!$this->foodCategories->contains($foodCategory)) {
+            $this->foodCategories->add($foodCategory);
+            $foodCategory->setFoodId($this);
+        }
+
+        return $this;
+    }
+
+    public function removeFoodCategory(FoodCategory $foodCategory): static
+    {
+        if ($this->foodCategories->removeElement($foodCategory)) {
+            // set the owning side to null (unless already changed)
+            if ($foodCategory->getFoodId() === $this) {
+                $foodCategory->setFoodId(null);
+            }
+        }
 
         return $this;
     }
