@@ -43,8 +43,21 @@ class Restaurant
     #[ORM\Column(type: Types::SMALLINT)]
     private ?int $maxGuest = null;
 
-    #[ORM\Column]
-    private ?int $Owner = null;
+    #[ORM\OneToOne(targetEntity: User::class, inversedBy: 'restaurant')]
+    #[ORM\JoinColumn(name: 'Owner', referencedColumnName: 'id', nullable: false)]
+    private ?User $owner = null;
+
+    public function getOwner(): ?User
+    {
+        return $this->owner;
+    }
+
+    public function setOwner(User $owner): static
+    {
+        $this->owner = $owner;
+        return $this;
+    }
+
 
     public function __construct()
     {
@@ -166,18 +179,6 @@ class Restaurant
     public function setMaxGuest(int $maxGuest): static
     {
         $this->maxGuest = $maxGuest;
-
-        return $this;
-    }
-
-    public function getOwner(): ?int
-    {
-        return $this->Owner;
-    }
-
-    public function setOwner(int $Owner): static
-    {
-        $this->Owner = $Owner;
 
         return $this;
     }
