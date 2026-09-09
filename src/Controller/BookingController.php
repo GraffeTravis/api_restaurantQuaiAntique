@@ -173,7 +173,7 @@ class BookingController extends AbstractController
     /**
      * Récupérer les réservations de l'utilisateur connecté.
      */
-    #[Route('', name: 'list', methods: ['GET'])]
+    #[Route('/', name: 'list', methods: ['GET'])]
     public function list(
         #[CurrentUser] ?User $user
     ): JsonResponse {
