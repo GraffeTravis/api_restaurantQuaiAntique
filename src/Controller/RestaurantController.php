@@ -14,6 +14,7 @@ use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 #[Route('/api/restaurant', name: 'app_api_restaurant_')]
+#[OA\Tag(name: 'Restaurant', description: 'Gestion des restaurants')]
 class RestaurantController extends AbstractController
 {
     public function __construct(private EntityManagerInterface $manager, 

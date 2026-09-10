@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use OpenApi\Attributes as OA;
 use App\Entity\Booking;
 use App\Entity\Restaurant;
 use App\Entity\User;
@@ -18,6 +19,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/api/bookings', name: 'app_api_bookings_')]
+#[OA\Tag(name: 'Bookings', description: 'Gestion des réservations au restaurant')]
 class BookingController extends AbstractController
 {
     public function __construct(
@@ -31,6 +33,136 @@ class BookingController extends AbstractController
      * Créer une réservation.
      */
     #[Route('', name: 'create', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/bookings',
+        summary: 'Créer une nouvelle réservation',
+        description: 'Créer une réservation pour un restaurant à une date et heure spécifiées',
+        requestBody: new OA\RequestBody(
+            required: true,
+            description: 'Données de la réservation',
+            content: new OA\JsonContent(
+                type: 'object',
+                required: ['restaurantId', 'date', 'hour', 'guestNumber'],
+                properties: [
+                    new OA\Property(
+                        property: 'restaurantId',
+                        type: 'integer',
+                        description: 'ID du restaurant',
+                        example: 1
+                    ),
+                    new OA\Property(
+                        property: 'date',
+                        type: 'string',
+                        format: 'date',
+                        description: 'Date de la réservation (format YYYY-MM-DD)',
+                        example: '2024-12-25'
+                    ),
+                    new OA\Property(
+                        property: 'hour',
+                        type: 'string',
+                        description: 'Heure de la réservation (format HH:MM, par tranche de 15min)',
+                        example: '19:30'
+                    ),
+                    new OA\Property(
+                        property: 'guestNumber',
+                        type: 'integer',
+                        description: 'Nombre de couverts',
+                        example: 4
+                    ),
+                    new OA\Property(
+                        property: 'allergy',
+                        type: 'string',
+                        description: 'Allergies ou restrictions alimentaires (optionnel)',
+                        example: 'Sans gluten, pas de cacahuètes',
+                        nullable: true
+                    ),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Réservation créée avec succès',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(
+                            property: 'message',
+                            type: 'string',
+                            example: 'Réservation créée avec succès'
+                        ),
+                        new OA\Property(
+                            property: 'booking',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer', example: 42),
+                                new OA\Property(property: 'date', type: 'string', example: '2024-12-25'),
+                                new OA\Property(property: 'hour', type: 'string', example: '19:30'),
+                                new OA\Property(property: 'guestNumber', type: 'integer', example: 4),
+                                new OA\Property(property: 'allergy', type: 'string', example: 'Pas de gluten'),
+                                new OA\Property(property: 'restaurantId', type: 'integer', example: 1),
+                            ]
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 400,
+                description: 'Données invalides ou manquantes',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(
+                            property: 'message',
+                            type: 'string',
+                            example: 'Les champs restaurantId, date, hour et guestNumber sont obligatoires'
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 401,
+                description: 'Utilisateur non authentifié',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(
+                            property: 'message',
+                            type: 'string',
+                            example: 'Utilisateur non authentifié'
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 404,
+                description: 'Restaurant non trouvé',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(
+                            property: 'message',
+                            type: 'string',
+                            example: 'Restaurant introuvable'
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 409,
+                description: 'Capacité du restaurant dépassée',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Le restaurant est complet pour ce créneau'),
+                        new OA\Property(property: 'capacity', type: 'integer', example: 50),
+                        new OA\Property(property: 'alreadyReserved', type: 'integer', example: 48),
+                        new OA\Property(property: 'requested', type: 'integer', example: 4),
+                    ]
+                )
+            ),
+        ]
+    )]
     public function create(
         Request $request,
         #[CurrentUser] ?User $user
@@ -174,6 +306,45 @@ class BookingController extends AbstractController
      * Récupérer les réservations de l'utilisateur connecté.
      */
     #[Route('/', name: 'list', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/bookings/',
+        summary: 'Récupérer mes réservations',
+        description: 'Récupère toutes les réservations de l\'utilisateur connecté, triées par date et heure',
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Liste des réservations',
+                content: new OA\JsonContent(
+                    type: 'array',
+                    items: new OA\Items(
+                        type: 'object',
+                        properties: [
+                            new OA\Property(property: 'id', type: 'integer', example: 42),
+                            new OA\Property(property: 'date', type: 'string', example: '2024-12-25'),
+                            new OA\Property(property: 'hour', type: 'string', example: '19:30'),
+                            new OA\Property(property: 'guestNumber', type: 'integer', example: 4),
+                            new OA\Property(property: 'allergy', type: 'string', example: 'Pas de gluten', nullable: true),
+                            new OA\Property(property: 'restaurantId', type: 'integer', example: 1),
+                        ]
+                    )
+                )
+            ),
+            new OA\Response(
+                response: 401,
+                description: 'Utilisateur non authentifié',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(
+                            property: 'message',
+                            type: 'string',
+                            example: 'Utilisateur non authentifié'
+                        ),
+                    ]
+                )
+            ),
+        ]
+    )]
     public function list(
         #[CurrentUser] ?User $user
     ): JsonResponse {
@@ -209,6 +380,80 @@ class BookingController extends AbstractController
      * Récupérer une réservation.
      */
     #[Route('/{id}', name: 'show', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/bookings/{id}',
+        summary: 'Récupérer les détails d\'une réservation par ID',
+        description: 'Récupère les détails d\'une réservation spécifique (accessible uniquement par le propriétaire)',
+        parameters: [
+            new OA\Parameter(
+                name: 'id',
+                in: 'path',
+                required: true,
+                description: 'ID de la réservation',
+                schema: new OA\Schema(type: 'integer'),
+                example: 42
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Détails de la réservation',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 42),
+                        new OA\Property(property: 'date', type: 'string', example: '2024-12-25'),
+                        new OA\Property(property: 'hour', type: 'string', example: '19:30'),
+                        new OA\Property(property: 'guestNumber', type: 'integer', example: 4),
+                        new OA\Property(property: 'allergy', type: 'string', example: 'Pas de gluten', nullable: true),
+                        new OA\Property(property: 'restaurantId', type: 'integer', example: 1),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 401,
+                description: 'Utilisateur non authentifié',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(
+                            property: 'message',
+                            type: 'string',
+                            example: 'Utilisateur non authentifié'
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'Accès interdit (ce n\'est pas votre réservation)',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(
+                            property: 'message',
+                            type: 'string',
+                            example: 'Accès interdit'
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 404,
+                description: 'Réservation non trouvée',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(
+                            property: 'message',
+                            type: 'string',
+                            example: 'Réservation introuvable'
+                        ),
+                    ]
+                )
+            ),
+        ]
+    )]
     public function show(
         int $id,
         #[CurrentUser] ?User $user
@@ -251,6 +496,79 @@ class BookingController extends AbstractController
      * Supprimer une réservation.
      */
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
+    #[OA\Delete(
+        path: '/api/bookings/{id}',
+        summary: 'Supprimer une réservation par ID',
+        description: 'Supprime une réservation (accessible uniquement par le propriétaire)',
+        parameters: [
+            new OA\Parameter(
+                name: 'id',
+                in: 'path',
+                required: true,
+                description: 'ID de la réservation',
+                schema: new OA\Schema(type: 'integer'),
+                example: 42
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Réservation supprimée avec succès',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(
+                            property: 'message',
+                            type: 'string',
+                            example: 'Réservation supprimée avec succès'
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 401,
+                description: 'Utilisateur non authentifié',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(
+                            property: 'message',
+                            type: 'string',
+                            example: 'Utilisateur non authentifié'
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'Accès interdit (ce n\'est pas votre réservation)',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(
+                            property: 'message',
+                            type: 'string',
+                            example: 'Accès interdit'
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 404,
+                description: 'Réservation non trouvée',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(
+                            property: 'message',
+                            type: 'string',
+                            example: 'Réservation introuvable'
+                        ),
+                    ]
+                )
+            ),
+        ]
+    )]
     public function delete(
         int $id,
         #[CurrentUser] ?User $user

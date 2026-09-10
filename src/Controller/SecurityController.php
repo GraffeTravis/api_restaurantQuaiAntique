@@ -15,6 +15,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 
 #[Route('api', name: 'app_api_')]
+#[OA\Tag(name: 'Authentification', description: 'Authentification des utilisateurs')]
 class SecurityController extends AbstractController
 {
 
