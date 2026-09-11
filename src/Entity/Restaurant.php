@@ -55,7 +55,7 @@ class Restaurant
     private ?int $maxGuest = null;
 
     #[ORM\OneToOne(targetEntity: User::class, inversedBy: 'restaurant')]
-    #[ORM\JoinColumn(name: 'owner_id', referencedColumnName: 'id', nullable: false)]
+    #[ORM\JoinColumn(name: 'owner', referencedColumnName: 'id', nullable: false)]
     #[Assert\NotNull(message: 'Le propriétaire du restaurant est obligatoire')]
     private ?User $owner = null;
 

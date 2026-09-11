@@ -17,7 +17,7 @@ class PictureFixtures extends Fixture implements DependentFixtureInterface
         for ($i = 1; $i <= 20; $i++) {
             
             /** @var Restaurant $restaurant */
-            $restaurant = $this->getReference('restaurant' . random_int(1, 20), Restaurant::class);
+            $restaurant = $this->getReference('restaurant', Restaurant::class);
 
             $picture = (new Picture())
                 ->setTitle("Image n°$i")

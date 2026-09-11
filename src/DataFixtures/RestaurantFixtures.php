@@ -16,24 +16,21 @@ class RestaurantFixtures extends Fixture implements DependentFixtureInterface
     /** @throws Exception */
     public function load(ObjectManager $manager): void
     {
-        $faker = Faker\Factory::create();
 
-        for ($i = 1; $i <= 20; $i++) {
             /** @var Restaurant $owner */
-            $owner = $this->getReference('admin', User::class); // ✅ user $i pour restaurant $i
+            $owner = $this->getReference('admin', User::class);
 
             $restaurant = (new Restaurant())
-                ->setName($faker->company())
-                ->setDescription($faker->text())
+                ->setName("Quai Antique")
+                ->setDescription("Le Quai Antique, restaurant d'exeption")
                 ->setAmOpeningTime([])
                 ->setPmOpeningTime([])
                 ->setMaxGuest(random_int(10, 50))
                 ->setCreatedAt(new DateTimeImmutable())
                 ->setOwner($owner);
 
-            $manager->persist($restaurant);
-            $this->addReference("restaurant" . $i, $restaurant);
-        }
+        $manager->persist($restaurant);
+        $this->addReference('restaurant', $restaurant);
 
         $manager->flush();
     }
