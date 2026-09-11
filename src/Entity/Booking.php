@@ -126,12 +126,12 @@ class Booking
 
     public function getRestaurant(): ?Restaurant
     {
-        return $this->Restaurant;
+        return $this->restaurant;
     }
 
-    public function setRestaurant(?Restaurant $Restaurant): static
+    public function setRestaurant(?Restaurant $restaurant): static
     {
-        $this->Restaurant = $Restaurant;
+        $this->restaurant = $restaurant;
 
         return $this;
     }

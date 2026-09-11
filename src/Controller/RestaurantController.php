@@ -11,18 +11,16 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\{JsonResponse, Request, Response};
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
-#[Route('/api/restaurant', name: 'app_api_restaurant_')]
-#[OA\Tag(name: 'Restaurant', description: 'Gestion des restaurants')]
+#[Route('/api/restaurants', name: 'app_api_restaurants_')]
+#[OA\Tag(name: 'Restaurants', description: 'Gestion des restaurants')]
 class RestaurantController extends AbstractController
 {
     public function __construct(
         private EntityManagerInterface $manager,
         private RestaurantRepository $repository,
-        private SerializerInterface $serializer,
         private UrlGeneratorInterface $urlGenerator,
     ) {
     }
@@ -31,22 +29,54 @@ class RestaurantController extends AbstractController
      * Créer un restaurant.
      * Seuls les administrateurs peuvent créer des restaurants.
      */
-    #[Route(methods: 'POST')]
+    #[Route('', name: 'create', methods: ['POST'])]
     #[OA\Post(
-        path: '/api/restaurant',
-        summary: 'Créer un restaurant',
+        path: '/api/restaurants',
+        summary: 'Créer un nouveau restaurant',
+        description: 'Créer un restaurant (seuls les administrateurs)',
+        security: [['bearerAuth' => []]],
         requestBody: new OA\RequestBody(
             required: true,
-            description: "Données du restaurant à créer",
+            description: 'Données du restaurant à créer',
             content: new OA\JsonContent(
                 type: 'object',
                 required: ['name', 'description', 'maxGuest'],
                 properties: [
-                    new OA\Property(property: 'name', type: 'string', example: 'Quai Antique', maxLength: 32),
-                    new OA\Property(property: 'description', type: 'string', example: 'Restaurant gastronomique'),
-                    new OA\Property(property: 'maxGuest', type: 'integer', example: 50),
-                    new OA\Property(property: 'amOpeningTime', type: 'array', items: new OA\Items(type: 'string'), example: ['11:30', '14:00']),
-                    new OA\Property(property: 'pmOpeningTime', type: 'array', items: new OA\Items(type: 'string'), example: ['19:00', '23:00']),
+                    new OA\Property(
+                        property: 'name',
+                        type: 'string',
+                        description: 'Nom du restaurant',
+                        example: 'Quai Antique',
+                        maxLength: 32
+                    ),
+                    new OA\Property(
+                        property: 'description',
+                        type: 'string',
+                        description: 'Description du restaurant',
+                        example: 'Restaurant gastronomique français'
+                    ),
+                    new OA\Property(
+                        property: 'maxGuest',
+                        type: 'integer',
+                        description: 'Nombre maximum de couverts',
+                        example: 50
+                    ),
+                    new OA\Property(
+                        property: 'amOpeningTime',
+                        type: 'array',
+                        items: new OA\Items(type: 'string'),
+                        description: 'Heures d\'ouverture matin (optionnel)',
+                        example: ['11:30', '14:00'],
+                        nullable: true
+                    ),
+                    new OA\Property(
+                        property: 'pmOpeningTime',
+                        type: 'array',
+                        items: new OA\Items(type: 'string'),
+                        description: 'Heures d\'ouverture soir (optionnel)',
+                        example: ['19:00', '23:00'],
+                        nullable: true
+                    ),
                 ]
             )
         ),
@@ -57,31 +87,60 @@ class RestaurantController extends AbstractController
                 content: new OA\JsonContent(
                     type: 'object',
                     properties: [
-                        new OA\Property(property: 'id', type: 'integer', example: 1),
-                        new OA\Property(property: 'name', type: 'string', example: 'Quai Antique'),
-                        new OA\Property(property: 'description', type: 'string', example: 'Restaurant gastronomique'),
-                        new OA\Property(property: 'maxGuest', type: 'integer', example: 50),
-                        new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
+                        new OA\Property(
+                            property: 'message',
+                            type: 'string',
+                            example: 'Restaurant créé avec succès'
+                        ),
+                        new OA\Property(
+                            property: 'restaurant',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer', example: 1),
+                                new OA\Property(property: 'name', type: 'string', example: 'Quai Antique'),
+                                new OA\Property(property: 'description', type: 'string', example: 'Restaurant gastronomique français'),
+                                new OA\Property(property: 'maxGuest', type: 'integer', example: 50),
+                                new OA\Property(property: 'amOpeningTime', type: 'array', items: new OA\Items(type: 'string'), example: ['11:30', '14:00'], nullable: true),
+                                new OA\Property(property: 'pmOpeningTime', type: 'array', items: new OA\Items(type: 'string'), example: ['19:00', '23:00'], nullable: true),
+                                new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', example: '2024-01-15T10:30:00+00:00'),
+                            ]
+                        ),
                     ]
                 )
             ),
             new OA\Response(
                 response: 400,
-                description: 'Données invalides',
+                description: 'Données invalides ou manquantes',
                 content: new OA\JsonContent(
                     type: 'object',
                     properties: [
-                        new OA\Property(property: 'message', type: 'string', example: 'Les champs name, description et maxGuest sont obligatoires'),
+                        new OA\Property(
+                            property: 'message',
+                            type: 'string',
+                            example: 'Les champs name, description et maxGuest sont obligatoires'
+                        ),
                     ]
                 )
             ),
             new OA\Response(
                 response: 401,
                 description: 'Utilisateur non authentifié',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Utilisateur non authentifié'),
+                    ]
+                )
             ),
             new OA\Response(
                 response: 403,
                 description: 'Accès interdit (administrateur requis)',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Accès interdit'),
+                    ]
+                )
             ),
         ]
     )]
@@ -96,7 +155,6 @@ class RestaurantController extends AbstractController
             );
         }
 
-        // Vérifier que l'utilisateur est administrateur
         if (!in_array('ROLE_ADMIN', $user->getRoles())) {
             return $this->json(
                 ['message' => 'Accès interdit'],
@@ -113,22 +171,19 @@ class RestaurantController extends AbstractController
             );
         }
 
-        // Validation des champs obligatoires
-        $requiredFields = ['name', 'description', 'maxGuest'];
-        foreach ($requiredFields as $field) {
-            if (!isset($data[$field])) {
-                return $this->json(
-                    ['message' => "Le champ '{$field}' est obligatoire"],
-                    Response::HTTP_BAD_REQUEST
-                );
-            }
+        // Vérification des champs obligatoires
+        if (!isset($data['name']) || !isset($data['description']) || !isset($data['maxGuest'])) {
+            return $this->json(
+                ['message' => 'Les champs name, description et maxGuest sont obligatoires'],
+                Response::HTTP_BAD_REQUEST
+            );
         }
 
         // Validation du nom
         $name = trim($data['name'] ?? '');
         if (empty($name) || strlen($name) > 32) {
             return $this->json(
-                ['message' => 'Le nom doit être non vide et < 32 caractères'],
+                ['message' => 'Le nom doit être non vide et maximum 32 caractères'],
                 Response::HTTP_BAD_REQUEST
             );
         }
@@ -170,61 +225,67 @@ class RestaurantController extends AbstractController
         $this->manager->persist($restaurant);
         $this->manager->flush();
 
-        $location = $this->urlGenerator->generate(
-            'app_api_restaurant_show',
-            ['id' => $restaurant->getId()],
-            UrlGeneratorInterface::ABSOLUTE_URL,
-        );
-
         return $this->json(
             [
-                'id' => $restaurant->getId(),
-                'name' => $restaurant->getName(),
-                'description' => $restaurant->getDescription(),
-                'maxGuest' => $restaurant->getMaxGuest(),
-                'createdAt' => $restaurant->getCreatedAt()->format('c'),
+                'message' => 'Restaurant créé avec succès',
+                'restaurant' => [
+                    'id' => $restaurant->getId(),
+                    'name' => $restaurant->getName(),
+                    'description' => $restaurant->getDescription(),
+                    'maxGuest' => $restaurant->getMaxGuest(),
+                    'amOpeningTime' => $restaurant->getAmOpeningTime(),
+                    'pmOpeningTime' => $restaurant->getPmOpeningTime(),
+                    'createdAt' => $restaurant->getCreatedAt()->format('c'),
+                ]
             ],
-            Response::HTTP_CREATED,
-            ['Location' => $location]
+            Response::HTTP_CREATED
         );
     }
 
     /**
      * Récupérer les détails d'un restaurant.
      */
-    #[Route('/{id}', name: 'show', methods: 'GET')]
+    #[Route('/{id}', name: 'show', methods: ['GET'])]
     #[OA\Get(
-        path: '/api/restaurant/{id}',
+        path: '/api/restaurants/{id}',
         summary: 'Afficher un restaurant par ID',
+        description: 'Récupère les détails d\'un restaurant spécifique',
         parameters: [
             new OA\Parameter(
                 name: 'id',
                 in: 'path',
                 required: true,
                 description: 'ID du restaurant',
-                schema: new OA\Schema(type: 'integer')
+                schema: new OA\Schema(type: 'integer'),
+                example: 1
             ),
         ],
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Restaurant trouvé',
+                description: 'Détails du restaurant',
                 content: new OA\JsonContent(
                     type: 'object',
                     properties: [
                         new OA\Property(property: 'id', type: 'integer', example: 1),
                         new OA\Property(property: 'name', type: 'string', example: 'Quai Antique'),
-                        new OA\Property(property: 'description', type: 'string', example: 'Restaurant gastronomique'),
+                        new OA\Property(property: 'description', type: 'string', example: 'Restaurant gastronomique français'),
                         new OA\Property(property: 'maxGuest', type: 'integer', example: 50),
-                        new OA\Property(property: 'amOpeningTime', type: 'array', items: new OA\Items(type: 'string'), example: ['11:30', '14:00']),
-                        new OA\Property(property: 'pmOpeningTime', type: 'array', items: new OA\Items(type: 'string'), example: ['19:00', '23:00']),
-                        new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
+                        new OA\Property(property: 'amOpeningTime', type: 'array', items: new OA\Items(type: 'string'), example: ['11:30', '14:00'], nullable: true),
+                        new OA\Property(property: 'pmOpeningTime', type: 'array', items: new OA\Items(type: 'string'), example: ['19:00', '23:00'], nullable: true),
+                        new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', example: '2024-01-15T10:30:00+00:00'),
                     ]
                 )
             ),
             new OA\Response(
                 response: 404,
                 description: 'Restaurant non trouvé',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Restaurant introuvable'),
+                    ]
+                )
             ),
         ]
     )]
@@ -254,30 +315,63 @@ class RestaurantController extends AbstractController
      * Modifier un restaurant.
      * Seul le propriétaire peut modifier son restaurant.
      */
-    #[Route('/{id}', name: 'update', methods: ['PUT', 'PATCH'])]
+    #[Route('/{id}', name: 'update', methods: ['PUT'])]
     #[OA\Put(
-        path: '/api/restaurant/{id}',
-        summary: 'Modifier un restaurant',
+        path: '/api/restaurants/{id}',
+        summary: 'Modifier un restaurant par ID',
+        description: 'Modifier les détails d\'un restaurant (seul le propriétaire peut modifier)',
+        security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(
                 name: 'id',
                 in: 'path',
                 required: true,
                 description: 'ID du restaurant',
-                schema: new OA\Schema(type: 'integer')
+                schema: new OA\Schema(type: 'integer'),
+                example: 1
             ),
         ],
         requestBody: new OA\RequestBody(
             required: true,
-            description: "Données du restaurant à modifier",
+            description: 'Données du restaurant à modifier',
             content: new OA\JsonContent(
                 type: 'object',
                 properties: [
-                    new OA\Property(property: 'name', type: 'string', example: 'Quai Antique'),
-                    new OA\Property(property: 'description', type: 'string', example: 'Restaurant gastronomique'),
-                    new OA\Property(property: 'maxGuest', type: 'integer', example: 50),
-                    new OA\Property(property: 'amOpeningTime', type: 'array', items: new OA\Items(type: 'string'), example: ['11:30', '14:00']),
-                    new OA\Property(property: 'pmOpeningTime', type: 'array', items: new OA\Items(type: 'string'), example: ['19:00', '23:00']),
+                    new OA\Property(
+                        property: 'name',
+                        type: 'string',
+                        description: 'Nom du restaurant',
+                        example: 'Quai Antique',
+                        maxLength: 32
+                    ),
+                    new OA\Property(
+                        property: 'description',
+                        type: 'string',
+                        description: 'Description du restaurant',
+                        example: 'Restaurant gastronomique français'
+                    ),
+                    new OA\Property(
+                        property: 'maxGuest',
+                        type: 'integer',
+                        description: 'Nombre maximum de couverts',
+                        example: 50
+                    ),
+                    new OA\Property(
+                        property: 'amOpeningTime',
+                        type: 'array',
+                        items: new OA\Items(type: 'string'),
+                        description: 'Heures d\'ouverture matin',
+                        example: ['11:30', '14:00'],
+                        nullable: true
+                    ),
+                    new OA\Property(
+                        property: 'pmOpeningTime',
+                        type: 'array',
+                        items: new OA\Items(type: 'string'),
+                        description: 'Heures d\'ouverture soir',
+                        example: ['19:00', '23:00'],
+                        nullable: true
+                    ),
                 ]
             )
         ),
@@ -285,22 +379,69 @@ class RestaurantController extends AbstractController
             new OA\Response(
                 response: 200,
                 description: 'Restaurant modifié avec succès',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(
+                            property: 'message',
+                            type: 'string',
+                            example: 'Restaurant modifié avec succès'
+                        ),
+                        new OA\Property(
+                            property: 'restaurant',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer', example: 1),
+                                new OA\Property(property: 'name', type: 'string', example: 'Quai Antique'),
+                                new OA\Property(property: 'description', type: 'string', example: 'Restaurant gastronomique français'),
+                                new OA\Property(property: 'maxGuest', type: 'integer', example: 50),
+                                new OA\Property(property: 'amOpeningTime', type: 'array', items: new OA\Items(type: 'string'), example: ['11:30', '14:00'], nullable: true),
+                                new OA\Property(property: 'pmOpeningTime', type: 'array', items: new OA\Items(type: 'string'), example: ['19:00', '23:00'], nullable: true),
+                                new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time', example: '2024-01-15T15:30:00+00:00', nullable: true),
+                            ]
+                        ),
+                    ]
+                )
             ),
             new OA\Response(
                 response: 400,
                 description: 'Données invalides',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Le nom doit être non vide et maximum 32 caractères'),
+                    ]
+                )
             ),
             new OA\Response(
                 response: 401,
                 description: 'Utilisateur non authentifié',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Utilisateur non authentifié'),
+                    ]
+                )
             ),
             new OA\Response(
                 response: 403,
                 description: 'Accès interdit (propriétaire requis)',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Accès interdit'),
+                    ]
+                )
             ),
             new OA\Response(
                 response: 404,
                 description: 'Restaurant non trouvé',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Restaurant introuvable'),
+                    ]
+                )
             ),
         ]
     )]
@@ -325,7 +466,6 @@ class RestaurantController extends AbstractController
             );
         }
 
-        // Vérifier que l'utilisateur est le propriétaire du restaurant
         if ($restaurant->getOwner() !== $user) {
             return $this->json(
                 ['message' => 'Accès interdit'],
@@ -347,7 +487,7 @@ class RestaurantController extends AbstractController
             $name = trim($data['name']);
             if (empty($name) || strlen($name) > 32) {
                 return $this->json(
-                    ['message' => 'Le nom doit être non vide et < 32 caractères'],
+                    ['message' => 'Le nom doit être non vide et maximum 32 caractères'],
                     Response::HTTP_BAD_REQUEST
                 );
             }
@@ -385,61 +525,91 @@ class RestaurantController extends AbstractController
         }
 
         $restaurant->setUpdateAt(new DateTimeImmutable());
-
         $this->manager->flush();
 
-        return $this->json([
-            'id' => $restaurant->getId(),
-            'name' => $restaurant->getName(),
-            'description' => $restaurant->getDescription(),
-            'maxGuest' => $restaurant->getMaxGuest(),
-            'amOpeningTime' => $restaurant->getAmOpeningTime(),
-            'pmOpeningTime' => $restaurant->getPmOpeningTime(),
-            'createdAt' => $restaurant->getCreatedAt()->format('c'),
-            'updatedAt' => $restaurant->getUpdateAt() ? $restaurant->getUpdateAt()->format('c') : null,
-        ]);
+        return $this->json(
+            [
+                'message' => 'Restaurant modifié avec succès',
+                'restaurant' => [
+                    'id' => $restaurant->getId(),
+                    'name' => $restaurant->getName(),
+                    'description' => $restaurant->getDescription(),
+                    'maxGuest' => $restaurant->getMaxGuest(),
+                    'amOpeningTime' => $restaurant->getAmOpeningTime(),
+                    'pmOpeningTime' => $restaurant->getPmOpeningTime(),
+                    'updatedAt' => $restaurant->getUpdateAt()?->format('c'),
+                ]
+            ]
+        );
     }
 
     /**
      * Supprimer un restaurant.
      * Seul le propriétaire ou un administrateur peut supprimer un restaurant.
      */
-    #[Route('/{id}', name: 'delete', methods: 'DELETE')]
+    #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
     #[OA\Delete(
-        path: '/api/restaurant/{id}',
-        summary: 'Supprimer un restaurant',
+        path: '/api/restaurants/{id}',
+        summary: 'Supprimer un restaurant par ID',
+        description: 'Supprime un restaurant (accessible uniquement par le propriétaire ou un administrateur)',
+        security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(
                 name: 'id',
                 in: 'path',
                 required: true,
                 description: 'ID du restaurant',
-                schema: new OA\Schema(type: 'integer')
+                schema: new OA\Schema(type: 'integer'),
+                example: 1
             ),
         ],
         responses: [
             new OA\Response(
-                response: 204,
+                response: 200,
                 description: 'Restaurant supprimé avec succès',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Restaurant supprimé avec succès'),
+                    ]
+                )
             ),
             new OA\Response(
                 response: 401,
                 description: 'Utilisateur non authentifié',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Utilisateur non authentifié'),
+                    ]
+                )
             ),
             new OA\Response(
                 response: 403,
-                description: 'Accès interdit',
+                description: 'Accès interdit (propriétaire ou administrateur requis)',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Accès interdit'),
+                    ]
+                )
             ),
             new OA\Response(
                 response: 404,
                 description: 'Restaurant non trouvé',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Restaurant introuvable'),
+                    ]
+                )
             ),
         ]
     )]
     public function delete(
         int $id,
         #[CurrentUser] ?User $user
-    ): Response {
+    ): JsonResponse {
         if (!$user) {
             return $this->json(
                 ['message' => 'Utilisateur non authentifié'],
@@ -456,7 +626,6 @@ class RestaurantController extends AbstractController
             );
         }
 
-        // Vérifier que l'utilisateur est le propriétaire ou un admin
         $isOwner = $restaurant->getOwner() === $user;
         $isAdmin = in_array('ROLE_ADMIN', $user->getRoles());
 
@@ -470,6 +639,8 @@ class RestaurantController extends AbstractController
         $this->manager->remove($restaurant);
         $this->manager->flush();
 
-        return $this->json(null, Response::HTTP_NO_CONTENT);
+        return $this->json(
+            ['message' => 'Restaurant supprimé avec succès']
+        );
     }
 }

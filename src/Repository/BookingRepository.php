@@ -29,7 +29,7 @@ class BookingRepository extends ServiceEntityRepository
     ): int {
         $result = $this->createQueryBuilder('b')
             ->select('COALESCE(SUM(b.guestNumber), 0)')
-            ->andWhere('b.Restaurant = :restaurant')
+            ->andWhere('b.restaurant = :restaurant')
             ->andWhere('b.orderDate = :date')
             ->andWhere('b.orderHour = :hour')
             ->setParameter('restaurant', $restaurant)
@@ -50,7 +50,7 @@ class BookingRepository extends ServiceEntityRepository
         DateTime $date
     ): array {
         return $this->createQueryBuilder('b')
-            ->andWhere('b.Restaurant = :restaurant')
+            ->andWhere('b.restaurant = :restaurant')
             ->andWhere('b.orderDate = :date')
             ->setParameter('restaurant', $restaurant)
             ->setParameter('date', $date)
@@ -59,4 +59,3 @@ class BookingRepository extends ServiceEntityRepository
             ->getResult();
     }
 }
-
