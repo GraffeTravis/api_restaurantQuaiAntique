@@ -7,6 +7,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: RestaurantRepository::class)]
 class Restaurant
@@ -17,9 +18,17 @@ class Restaurant
     private ?int $id = null;
 
     #[ORM\Column(length: 32)]
+    #[Assert\NotBlank(message: 'Le nom du restaurant est obligatoire')]
+    #[Assert\Length(
+        min: 1,
+        max: 32,
+        minMessage: 'Le nom doit contenir au moins 1 caractère',
+        maxMessage: 'Le nom ne doit pas dépasser 32 caractères'
+    )]
     private ?string $name = null;
 
     #[ORM\Column(type: Types::TEXT)]
+    #[Assert\NotBlank(message: 'La description est obligatoire')]
     private ?string $description = null;
 
     #[ORM\Column]
@@ -41,16 +50,19 @@ class Restaurant
     private Collection $pictures;
 
     #[ORM\Column(type: Types::SMALLINT)]
+    #[Assert\NotNull(message: 'Le nombre maximal de couverts est obligatoire')]
+    #[Assert\Positive(message: 'Le nombre de couverts doit être supérieur à 0')]
     private ?int $maxGuest = null;
 
     #[ORM\OneToOne(targetEntity: User::class, inversedBy: 'restaurant')]
-    #[ORM\JoinColumn(name: 'Owner', referencedColumnName: 'id', nullable: false)]
+    #[ORM\JoinColumn(name: 'owner_id', referencedColumnName: 'id', nullable: false)]
+    #[Assert\NotNull(message: 'Le propriétaire du restaurant est obligatoire')]
     private ?User $owner = null;
 
     /**
      * @var Collection<int, Booking>
      */
-    #[ORM\OneToMany(targetEntity: Booking::class, mappedBy: 'Restaurant', orphanRemoval: true)]
+    #[ORM\OneToMany(targetEntity: Booking::class, mappedBy: 'restaurant', orphanRemoval: true)]
     private Collection $bookings;
 
     /**
@@ -59,24 +71,14 @@ class Restaurant
     #[ORM\OneToMany(targetEntity: Menu::class, mappedBy: 'restaurant', orphanRemoval: true)]
     private Collection $menus;
 
-    public function getOwner(): ?User
-    {
-        return $this->owner;
-    }
-
-    public function setOwner(User $owner): static
-    {
-        $this->owner = $owner;
-        return $this;
-    }
-
-
     public function __construct()
     {
         $this->pictures = new ArrayCollection();
         $this->bookings = new ArrayCollection();
         $this->menus = new ArrayCollection();
     }
+
+    // ==================== Getters & Setters ====================
 
     public function getId(): ?int
     {
@@ -91,7 +93,6 @@ class Restaurant
     public function setName(string $name): static
     {
         $this->name = $name;
-
         return $this;
     }
 
@@ -103,7 +104,6 @@ class Restaurant
     public function setDescription(string $description): static
     {
         $this->description = $description;
-
         return $this;
     }
 
@@ -115,7 +115,6 @@ class Restaurant
     public function setAmOpeningTime(array $amOpeningTime): static
     {
         $this->amOpeningTime = $amOpeningTime;
-
         return $this;
     }
 
@@ -127,7 +126,6 @@ class Restaurant
     public function setPmOpeningTime(array $pmOpeningTime): static
     {
         $this->pmOpeningTime = $pmOpeningTime;
-
         return $this;
     }
 
@@ -139,7 +137,6 @@ class Restaurant
     public function setUpdateAt(?\DateTimeImmutable $updateAt): static
     {
         $this->updateAt = $updateAt;
-
         return $this;
     }
 
@@ -151,9 +148,32 @@ class Restaurant
     public function setCreatedAt(\DateTimeImmutable $createdAt): static
     {
         $this->createdAt = $createdAt;
-
         return $this;
     }
+
+    public function getMaxGuest(): ?int
+    {
+        return $this->maxGuest;
+    }
+
+    public function setMaxGuest(int $maxGuest): static
+    {
+        $this->maxGuest = $maxGuest;
+        return $this;
+    }
+
+    public function getOwner(): ?User
+    {
+        return $this->owner;
+    }
+
+    public function setOwner(User $owner): static
+    {
+        $this->owner = $owner;
+        return $this;
+    }
+
+    // ==================== Pictures ====================
 
     /**
      * @return Collection<int, Picture>
@@ -176,7 +196,6 @@ class Restaurant
     public function removePicture(Picture $picture): static
     {
         if ($this->pictures->removeElement($picture)) {
-            // set the owning side to null (unless already changed)
             if ($picture->getRestaurant() === $this) {
                 $picture->setRestaurant(null);
             }
@@ -185,17 +204,7 @@ class Restaurant
         return $this;
     }
 
-    public function getMaxGuest(): ?int
-    {
-        return $this->maxGuest;
-    }
-
-    public function setMaxGuest(int $maxGuest): static
-    {
-        $this->maxGuest = $maxGuest;
-
-        return $this;
-    }
+    // ==================== Bookings ====================
 
     /**
      * @return Collection<int, Booking>
@@ -218,7 +227,6 @@ class Restaurant
     public function removeBooking(Booking $booking): static
     {
         if ($this->bookings->removeElement($booking)) {
-            // set the owning side to null (unless already changed)
             if ($booking->getRestaurant() === $this) {
                 $booking->setRestaurant(null);
             }
@@ -226,6 +234,47 @@ class Restaurant
 
         return $this;
     }
+
+    /**
+     * Obtenir le nombre total de couverts réservés pour une date/heure donnée.
+     *
+     * @param \DateTimeImmutable $date
+     * @param string $hour Format: HH:mm
+     *
+     * @return int
+     */
+    public function getBookedGuestsForSlot(\DateTimeImmutable $date, string $hour): int
+    {
+        $totalGuests = 0;
+
+        foreach ($this->bookings as $booking) {
+            if (
+                $booking->getOrderDate() == $date &&
+                $booking->getOrderHour()->format('H:i') === $hour
+            ) {
+                $totalGuests += $booking->getGuestNumber();
+            }
+        }
+
+        return $totalGuests;
+    }
+
+    /**
+     * Vérifier si le restaurant a une disponibilité pour un nombre de couverts.
+     *
+     * @param int $guestNumber
+     * @param \DateTimeImmutable $date
+     * @param string $hour Format: HH:mm
+     *
+     * @return bool
+     */
+    public function hasAvailability(int $guestNumber, \DateTimeImmutable $date, string $hour): bool
+    {
+        $bookedGuests = $this->getBookedGuestsForSlot($date, $hour);
+        return ($bookedGuests + $guestNumber) <= $this->maxGuest;
+    }
+
+    // ==================== Menus ====================
 
     /**
      * @return Collection<int, Menu>
@@ -248,7 +297,6 @@ class Restaurant
     public function removeMenu(Menu $menu): static
     {
         if ($this->menus->removeElement($menu)) {
-            // set the owning side to null (unless already changed)
             if ($menu->getRestaurant() === $this) {
                 $menu->setRestaurant(null);
             }
