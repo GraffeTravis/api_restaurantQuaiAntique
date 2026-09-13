@@ -29,6 +29,22 @@ security:
         - { path: ^/api/login$, roles: PUBLIC_ACCESS, methods: [POST] }
         - { path: ^/api/doc, roles: PUBLIC_ACCESS }
 
+        # CARTE PUBLIQUE
+        - { path: ^/api/categories$, roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: ^/api/categories/[0-9]+$, roles: PUBLIC_ACCESS, methods: [GET] }
+
+        - { path: ^/api/foods$, roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: ^/api/foods/[0-9]+$, roles: PUBLIC_ACCESS, methods: [GET] }
+
+        - { path: ^/api/menus$, roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: ^/api/menus/[0-9]+$, roles: PUBLIC_ACCESS, methods: [GET] }
+
+        
+        # ADMINISTRATION DE LA CARTE
+        - { path: ^/api/categories, roles: ROLE_ADMIN, methods: [POST, PUT, PATCH, DELETE] }
+        - { path: ^/api/foods, roles: ROLE_ADMIN, methods: [POST, PUT, PATCH, DELETE] }
+        - { path: ^/api/menus, roles: ROLE_ADMIN, methods: [POST, PUT, PATCH, DELETE] }
+
         # Administration du restaurant : administrateur uniquement.
         - { path: ^/api/restaurant, roles: ROLE_ADMIN, methods: [POST, PUT, PATCH, DELETE] }
         - { path: ^/api/restaurant, roles: ROLE_USER, methods: [GET] }

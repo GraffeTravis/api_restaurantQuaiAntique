@@ -33,24 +33,24 @@ class MenuCategory
         return $this;
     }
 
-    public function getmenu(): ?Menu
+    public function getMenu(): ?Menu
     {
         return $this->menu;
     }
 
-    public function setmenu(?Menu $menu): static
+    public function setMenu(?Menu $menu): static
     {
         $this->menu = $menu;
 
         return $this;
     }
 
-    public function getcategory(): ?Category
+    public function getCategory(): ?Category
     {
         return $this->category;
     }
 
-    public function setcategory(?Category $category): static
+    public function setCategory(?Category $category): static
     {
         $this->category = $category;
 

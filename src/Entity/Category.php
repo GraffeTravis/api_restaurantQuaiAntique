@@ -27,13 +27,13 @@ class Category
     /**
      * @var Collection<int, MenuCategory>
      */
-    #[ORM\OneToMany(targetEntity: MenuCategory::class, mappedBy: 'categoryId', orphanRemoval: true)]
+    #[ORM\OneToMany(targetEntity: MenuCategory::class, mappedBy: 'category', orphanRemoval: true)]
     private Collection $menuCategories;
 
     /**
      * @var Collection<int, FoodCategory>
      */
-    #[ORM\OneToMany(targetEntity: FoodCategory::class, mappedBy: 'categoryId', orphanRemoval: true)]
+    #[ORM\OneToMany(targetEntity: FoodCategory::class, mappedBy: 'category', orphanRemoval: true)]
     private Collection $foodCategories;
 
     public function __construct()

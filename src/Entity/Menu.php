@@ -38,7 +38,7 @@ class Menu
     /**
      * @var Collection<int, MenuCategory>
      */
-    #[ORM\OneToMany(targetEntity: MenuCategory::class, mappedBy: 'menuId', orphanRemoval: true)]
+    #[ORM\OneToMany(targetEntity: MenuCategory::class, mappedBy: 'menu', orphanRemoval: true)]
     private Collection $menuCategories;
 
     public function __construct()

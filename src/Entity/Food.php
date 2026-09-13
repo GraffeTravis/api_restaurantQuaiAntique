@@ -34,7 +34,7 @@ class Food
     /**
      * @var Collection<int, FoodCategory>
      */
-    #[ORM\OneToMany(targetEntity: FoodCategory::class, mappedBy: 'foodId', orphanRemoval: true)]
+    #[ORM\OneToMany(targetEntity: FoodCategory::class, mappedBy: 'food', orphanRemoval: true)]
     private Collection $foodCategories;
 
     public function __construct()
