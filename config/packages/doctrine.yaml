@@ -29,6 +29,11 @@ when@test:
 
 when@prod:
     doctrine:
+        dbal:
+            # Heroku Postgres does not include a serverVersion query parameter
+            # in DATABASE_URL during build. Declaring it avoids prod cache warmup
+            # failing before the app can start.
+            server_version: '18'
         orm:
             query_cache_driver:
                 type: pool
