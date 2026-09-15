@@ -3,10 +3,11 @@
 namespace App\Tests\Entity;
 
 use App\Entity\Restaurant;
+use App\Entity\User;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 
-class UserTest extends TestCase
+class RestaurantTest extends TestCase
 {
     public static function createRestaurant(): \Generator
     {
@@ -21,7 +22,7 @@ class UserTest extends TestCase
         $restaurant = new \App\Entity\Restaurant();
         $restaurant->setName($name);
         $restaurant->setMaxGuest(50);
-        $restaurant->setOwner("Timéo");
+        $restaurant->setOwner(new User());
 
         $this->assertSame($name, $restaurant->getName());
     }
