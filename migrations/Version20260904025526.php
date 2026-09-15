@@ -20,6 +20,10 @@ final class Version20260904025526 extends AbstractMigration
     public function up(Schema $schema): void
     {
         // this up() migration is auto-generated, please modify it to your needs
+        if ($this->connection->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform) {
+            return;
+        }
+
         $this->addSql('ALTER TABLE restaurant ADD max_guest SMALLINT NOT NULL, ADD owner INT NOT NULL');
         $this->addSql('ALTER TABLE user ADD guest_number SMALLINT DEFAULT NULL, ADD allergy VARCHAR(255) DEFAULT NULL');
     }
@@ -27,6 +31,10 @@ final class Version20260904025526 extends AbstractMigration
     public function down(Schema $schema): void
     {
         // this down() migration is auto-generated, please modify it to your needs
+        if ($this->connection->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform) {
+            return;
+        }
+
         $this->addSql('ALTER TABLE restaurant DROP max_guest, DROP owner');
         $this->addSql('ALTER TABLE user DROP guest_number, DROP allergy');
     }

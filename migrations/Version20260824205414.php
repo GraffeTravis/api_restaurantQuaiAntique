@@ -20,12 +20,20 @@ final class Version20260824205414 extends AbstractMigration
     public function up(Schema $schema): void
     {
         // this up() migration is auto-generated, please modify it to your needs
+        if ($this->connection->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform) {
+            return;
+        }
+
         $this->addSql('ALTER TABLE user ADD first_name VARCHAR(64) NOT NULL, ADD last_name VARCHAR(64) NOT NULL');
     }
 
     public function down(Schema $schema): void
     {
         // this down() migration is auto-generated, please modify it to your needs
+        if ($this->connection->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform) {
+            return;
+        }
+
         $this->addSql('ALTER TABLE user DROP first_name, DROP last_name');
     }
 }

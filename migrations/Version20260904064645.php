@@ -20,6 +20,10 @@ final class Version20260904064645 extends AbstractMigration
     public function up(Schema $schema): void
     {
         // this up() migration is auto-generated, please modify it to your needs
+        if ($this->connection->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform) {
+            return;
+        }
+
         $this->addSql('ALTER TABLE food_category DROP FOREIGN KEY `FK_2E013E838E255BBD`');
         $this->addSql('ALTER TABLE food_category DROP FOREIGN KEY `FK_2E013E839777D11E`');
         $this->addSql('DROP INDEX IDX_2E013E839777D11E ON food_category');
@@ -43,6 +47,10 @@ final class Version20260904064645 extends AbstractMigration
     public function down(Schema $schema): void
     {
         // this down() migration is auto-generated, please modify it to your needs
+        if ($this->connection->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform) {
+            return;
+        }
+
         $this->addSql('ALTER TABLE food_category DROP FOREIGN KEY FK_2E013E83BA8E87C4');
         $this->addSql('ALTER TABLE food_category DROP FOREIGN KEY FK_2E013E8312469DE2');
         $this->addSql('DROP INDEX IDX_2E013E83BA8E87C4 ON food_category');

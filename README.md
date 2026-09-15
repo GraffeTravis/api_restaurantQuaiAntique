@@ -107,6 +107,8 @@ release: php bin/console doctrine:migrations:migrate --no-interaction
 
 Le processus `web` lance l'API Symfony depuis le dossier `public/`. Le processus `release` execute les migrations Doctrine a chaque deploiement.
 
+Les anciennes migrations du dossier `migrations/` proviennent de l'historique local du projet. En production Heroku, le projet utilise le dossier `migrations_prod/`, qui contient une migration PostgreSQL compatible avec Heroku Postgres.
+
 Variables a configurer dans Heroku :
 
 ```text
