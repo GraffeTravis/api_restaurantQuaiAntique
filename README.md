@@ -95,3 +95,41 @@ Avant mise en production :
 - configurer `CORS_ALLOW_ORIGIN` avec l'URL publique du front-end
 - executer les migrations
 - ne jamais versionner de secrets dans `.env.local`
+
+### Deploiement Heroku
+
+Le projet contient un `Procfile` pour Heroku :
+
+```text
+web: heroku-php-apache2 public/
+release: php bin/console doctrine:migrations:migrate --no-interaction
+```
+
+Le processus `web` lance l'API Symfony depuis le dossier `public/`. Le processus `release` execute les migrations Doctrine a chaque deploiement.
+
+Variables a configurer dans Heroku :
+
+```text
+APP_ENV=prod
+APP_SECRET=<secret long genere>
+CORS_ALLOW_ORIGIN=^https://<url-front-vercel>\.vercel\.app$
+```
+
+La variable `DATABASE_URL` est ajoutee automatiquement par l'add-on Heroku Postgres.
+
+Commandes utiles :
+
+```bash
+heroku create <nom-application>
+heroku addons:create heroku-postgresql:mini -a <nom-application>
+heroku config:set APP_ENV=prod APP_SECRET=<secret> CORS_ALLOW_ORIGIN='^https://<url-front-vercel>\.vercel\.app$' -a <nom-application>
+git push heroku main
+heroku run php bin/console doctrine:fixtures:load --no-interaction -a <nom-application>
+```
+
+Apres deploiement, verifier :
+
+```text
+https://<nom-application>.herokuapp.com/api/doc
+https://<nom-application>.herokuapp.com/api/restaurants/1
+```
