@@ -361,7 +361,6 @@ class CategoryController extends AbstractController
     {
         return [
             'id' => $category->getId(),
-            'uuid' => $category->getUuid(),
             'title' => $category->getTitle(),
             'createdAt' => $category->getCreatedAt()?->format(DATE_ATOM),
             'updatedAt' => $category->getUpdatedAt()?->format(DATE_ATOM),

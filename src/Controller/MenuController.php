@@ -512,20 +512,17 @@ class MenuController extends AbstractController
 
             $categories[] = [
                 'id' => $category->getId(),
-                'uuid' => $category->getUuid(),
                 'title' => $category->getTitle(),
             ];
         }
 
         return [
             'id' => $menu->getId(),
-            'uuid' => $menu->getUuid(),
             'title' => $menu->getTitle(),
             'description' => $menu->getDescription(),
             'price' => $menu->getPrice(),
             'restaurant' => [
                 'id' => $menu->getRestaurant()?->getId(),
-                'uuid' => $menu->getRestaurant()?->getUuid(),
                 'name' => $menu->getRestaurant()?->getName(),
             ],
             'categories' => $categories,
