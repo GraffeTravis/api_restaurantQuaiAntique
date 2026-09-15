@@ -3,8 +3,8 @@
 namespace App\Tests\Entity;
 
 use App\Entity\User;
-use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
 
 class UserTest extends TestCase
 {
@@ -21,12 +21,15 @@ class UserTest extends TestCase
         $user = new User();
         $user->setEmail($email);
 
-        $this->assertSame($email, $user->getEmail());
+        self::assertSame($email, $user->getEmail());
     }
 
-    public function testTheAutomaticApiTokenSettingWhenAnUserIsCreated(): void
+    public function testUserGetsSecurityDefaultsOnCreation(): void
     {
         $user = new User();
-        $this->assertNotNull($user->getApiToken());
+
+        self::assertNotNull($user->getApiToken());
+        self::assertNotNull($user->getUuid());
+        self::assertContains('ROLE_USER', $user->getRoles());
     }
 }
