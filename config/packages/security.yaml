@@ -39,6 +39,12 @@ security:
         - { path: ^/api/menus$, roles: PUBLIC_ACCESS, methods: [GET] }
         - { path: ^/api/menus/[0-9]+$, roles: PUBLIC_ACCESS, methods: [GET] }
 
+        - { path: ^/api/bookings/availability$, roles: PUBLIC_ACCESS, methods: [GET] }
+
+        - { path: ^/api/restaurants/[0-9]+$, roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: ^/api/restaurants/[0-9]+/pictures$, roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: ^/api/restaurants/[0-9]+/pictures/[0-9]+$, roles: PUBLIC_ACCESS, methods: [GET] }
+
         
         # ADMINISTRATION DE LA CARTE
         - { path: ^/api/categories, roles: ROLE_ADMIN, methods: [POST, PUT, PATCH, DELETE] }
@@ -46,8 +52,7 @@ security:
         - { path: ^/api/menus, roles: ROLE_ADMIN, methods: [POST, PUT, PATCH, DELETE] }
 
         # Administration du restaurant : administrateur uniquement.
-        - { path: ^/api/restaurant, roles: ROLE_ADMIN, methods: [POST, PUT, PATCH, DELETE] }
-        - { path: ^/api/restaurant, roles: ROLE_USER, methods: [GET] }
+        - { path: ^/api/restaurants, roles: ROLE_ADMIN, methods: [POST, PUT, PATCH, DELETE] }
 
         # Toutes les autres routes API nécessitent une authentification.
         - { path: ^/api, roles: ROLE_USER }
