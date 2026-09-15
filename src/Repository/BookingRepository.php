@@ -25,16 +25,25 @@ class BookingRepository extends ServiceEntityRepository
     public function getTotalGuestsForSlot(
         Restaurant $restaurant,
         DateTime $date,
-        DateTime $hour
+        DateTime $hour,
+        ?Booking $excludedBooking = null
     ): int {
-        $result = $this->createQueryBuilder('b')
+        $queryBuilder = $this->createQueryBuilder('b')
             ->select('COALESCE(SUM(b.guestNumber), 0)')
             ->andWhere('b.restaurant = :restaurant')
             ->andWhere('b.orderDate = :date')
             ->andWhere('b.orderHour = :hour')
             ->setParameter('restaurant', $restaurant)
             ->setParameter('date', $date)
-            ->setParameter('hour', $hour)
+            ->setParameter('hour', $hour);
+
+        if ($excludedBooking?->getId() !== null) {
+            $queryBuilder
+                ->andWhere('b != :excludedBooking')
+                ->setParameter('excludedBooking', $excludedBooking);
+        }
+
+        $result = $queryBuilder
             ->getQuery()
             ->getSingleScalarResult();
 

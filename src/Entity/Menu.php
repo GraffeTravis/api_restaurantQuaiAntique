@@ -142,7 +142,7 @@ class Menu
     {
         if (!$this->menuCategories->contains($menuCategory)) {
             $this->menuCategories->add($menuCategory);
-            $menuCategory->setMenuId($this);
+            $menuCategory->setMenu($this);
         }
 
         return $this;
@@ -152,8 +152,8 @@ class Menu
     {
         if ($this->menuCategories->removeElement($menuCategory)) {
             // set the owning side to null (unless already changed)
-            if ($menuCategory->getMenuId() === $this) {
-                $menuCategory->setMenuId(null);
+            if ($menuCategory->getMenu() === $this) {
+                $menuCategory->setMenu(null);
             }
         }
 

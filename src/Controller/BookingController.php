@@ -222,7 +222,7 @@ class BookingController extends AbstractController
         }
 
         // Validation de la date
-        $orderDate = DateTime::createFromFormat('Y-m-d', $data['date']);
+        $orderDate = DateTime::createFromFormat('!Y-m-d', $data['date']);
 
         if (!$orderDate || $orderDate->format('Y-m-d') !== $data['date']) {
             return $this->json(
@@ -232,7 +232,7 @@ class BookingController extends AbstractController
         }
 
         // Validation de l'heure
-        $orderHour = DateTime::createFromFormat('H:i', $data['hour']);
+        $orderHour = DateTime::createFromFormat('!H:i', $data['hour']);
 
         if (!$orderHour || $orderHour->format('H:i') !== $data['hour']) {
             return $this->json(
@@ -247,6 +247,13 @@ class BookingController extends AbstractController
         if ($minutes % 15 !== 0) {
             return $this->json(
                 ['message' => 'Les réservations doivent être effectuées sur un créneau de 15 minutes'],
+                Response::HTTP_BAD_REQUEST
+            );
+        }
+
+        if (!$this->isOpenAt($restaurant, $orderDate, $orderHour)) {
+            return $this->json(
+                ['message' => 'Le restaurant est fermé sur ce créneau'],
                 Response::HTTP_BAD_REQUEST
             );
         }
@@ -289,17 +296,72 @@ class BookingController extends AbstractController
         return $this->json(
             [
                 'message' => 'Réservation créée avec succès',
-                'booking' => [
-                    'id' => $booking->getId(),
-                    'date' => $booking->getOrderDate()->format('Y-m-d'),
-                    'hour' => $booking->getOrderHour()->format('H:i'),
-                    'guestNumber' => $booking->getGuestNumber(),
-                    'allergy' => $booking->getAllergy(),
-                    'restaurantId' => $restaurant->getId(),
-                ],
+                'booking' => $this->serializeBooking($booking),
             ],
             Response::HTTP_CREATED
         );
+    }
+
+    #[Route('/availability', name: 'availability', methods: ['GET'])]
+    public function availability(Request $request): JsonResponse
+    {
+        $restaurantId = $request->query->get('restaurantId', '1');
+        $date = $request->query->get('date');
+        $hour = $request->query->get('hour');
+        $guestNumber = (int) $request->query->get('guestNumber', '1');
+        $excludeBookingId = $request->query->get('excludeBookingId');
+
+        if (!$date || !$hour || $guestNumber < 1) {
+            return $this->json(
+                ['message' => 'Les champs date, hour et guestNumber sont obligatoires'],
+                Response::HTTP_BAD_REQUEST
+            );
+        }
+
+        $restaurant = $this->restaurantRepository->find((int) $restaurantId);
+
+        if (!$restaurant) {
+            return $this->json(
+                ['message' => 'Restaurant introuvable'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        $orderDate = DateTime::createFromFormat('!Y-m-d', $date);
+        $orderHour = DateTime::createFromFormat('!H:i', $hour);
+
+        if (!$orderDate || $orderDate->format('Y-m-d') !== $date || !$orderHour || $orderHour->format('H:i') !== $hour) {
+            return $this->json(
+                ['message' => 'Format de date ou heure invalide'],
+                Response::HTTP_BAD_REQUEST
+            );
+        }
+
+        if (((int) $orderHour->format('i')) % 15 !== 0 || !$this->isOpenAt($restaurant, $orderDate, $orderHour)) {
+            return $this->json([
+                'available' => false,
+                'message' => 'Créneau indisponible',
+            ]);
+        }
+
+        $excludedBooking = $excludeBookingId
+            ? $this->bookingRepository->find((int) $excludeBookingId)
+            : null;
+
+        $alreadyReserved = $this->bookingRepository->getTotalGuestsForSlot(
+            $restaurant,
+            $orderDate,
+            $orderHour,
+            $excludedBooking
+        );
+        $remaining = max(0, $restaurant->getMaxGuest() - $alreadyReserved);
+
+        return $this->json([
+            'available' => $guestNumber <= $remaining,
+            'capacity' => $restaurant->getMaxGuest(),
+            'alreadyReserved' => $alreadyReserved,
+            'remaining' => $remaining,
+        ]);
     }
 
     /**
@@ -374,6 +436,62 @@ class BookingController extends AbstractController
         }
 
         return $this->json($result);
+    }
+
+    #[Route('/admin', name: 'admin_list', methods: ['GET'])]
+    public function adminList(
+        Request $request,
+        #[CurrentUser] ?User $user
+    ): JsonResponse {
+        if (!$user || !in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return $this->json(
+                ['message' => 'Accès interdit'],
+                Response::HTTP_FORBIDDEN
+            );
+        }
+
+        $criteria = [];
+        $date = $request->query->get('date');
+        $restaurantId = $request->query->get('restaurantId');
+
+        if ($date) {
+            $orderDate = DateTime::createFromFormat('!Y-m-d', $date);
+
+            if (!$orderDate || $orderDate->format('Y-m-d') !== $date) {
+                return $this->json(
+                    ['message' => 'Format de date invalide. Utilisez YYYY-MM-DD'],
+                    Response::HTTP_BAD_REQUEST
+                );
+            }
+
+            $criteria['orderDate'] = $orderDate;
+        }
+
+        if ($restaurantId) {
+            $restaurant = $this->restaurantRepository->find((int) $restaurantId);
+
+            if (!$restaurant) {
+                return $this->json(
+                    ['message' => 'Restaurant introuvable'],
+                    Response::HTTP_NOT_FOUND
+                );
+            }
+
+            $criteria['restaurant'] = $restaurant;
+        }
+
+        $bookings = $this->bookingRepository->findBy(
+            $criteria,
+            ['orderDate' => 'ASC', 'orderHour' => 'ASC']
+        );
+
+        return $this->json([
+            'bookings' => array_map(
+                fn (Booking $booking) => $this->serializeBooking($booking),
+                $bookings
+            ),
+            'total' => count($bookings),
+        ]);
     }
 
     /**
@@ -474,21 +592,147 @@ class BookingController extends AbstractController
             );
         }
 
-        // Un utilisateur ne peut consulter que ses propres réservations.
-        if ($booking->getClient() !== $user) {
+        if (!$this->canManageBooking($booking, $user)) {
             return $this->json(
                 ['message' => 'Accès interdit'],
                 Response::HTTP_FORBIDDEN
             );
         }
 
+        return $this->json($this->serializeBooking($booking));
+    }
+
+    #[Route('/{id}', name: 'update', methods: ['PUT'])]
+    public function update(
+        int $id,
+        Request $request,
+        #[CurrentUser] ?User $user
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(
+                ['message' => 'Utilisateur non authentifié'],
+                Response::HTTP_UNAUTHORIZED
+            );
+        }
+
+        $booking = $this->bookingRepository->find($id);
+
+        if (!$booking) {
+            return $this->json(
+                ['message' => 'Réservation introuvable'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        if (!$this->canManageBooking($booking, $user)) {
+            return $this->json(
+                ['message' => 'Accès interdit'],
+                Response::HTTP_FORBIDDEN
+            );
+        }
+
+        $data = json_decode($request->getContent(), true);
+
+        if (!is_array($data)) {
+            return $this->json(
+                ['message' => 'JSON invalide'],
+                Response::HTTP_BAD_REQUEST
+            );
+        }
+
+        $restaurant = $booking->getRestaurant();
+
+        if (isset($data['restaurantId'])) {
+            $restaurant = $this->restaurantRepository->find((int) $data['restaurantId']);
+
+            if (!$restaurant) {
+                return $this->json(
+                    ['message' => 'Restaurant introuvable'],
+                    Response::HTTP_NOT_FOUND
+                );
+            }
+        }
+
+        $guestNumber = isset($data['guestNumber'])
+            ? (int) $data['guestNumber']
+            : $booking->getGuestNumber();
+
+        if ($guestNumber < 1 || $guestNumber > $restaurant->getMaxGuest()) {
+            return $this->json(
+                ['message' => 'Nombre de couverts invalide'],
+                Response::HTTP_BAD_REQUEST
+            );
+        }
+
+        $date = $data['date'] ?? $booking->getOrderDate()->format('Y-m-d');
+        $hour = $data['hour'] ?? $booking->getOrderHour()->format('H:i');
+        $orderDate = DateTime::createFromFormat('!Y-m-d', $date);
+        $orderHour = DateTime::createFromFormat('!H:i', $hour);
+
+        if (!$orderDate || $orderDate->format('Y-m-d') !== $date) {
+            return $this->json(
+                ['message' => 'Format de date invalide. Utilisez YYYY-MM-DD'],
+                Response::HTTP_BAD_REQUEST
+            );
+        }
+
+        if (!$orderHour || $orderHour->format('H:i') !== $hour) {
+            return $this->json(
+                ['message' => 'Format d\'heure invalide. Utilisez HH:MM'],
+                Response::HTTP_BAD_REQUEST
+            );
+        }
+
+        if (((int) $orderHour->format('i')) % 15 !== 0) {
+            return $this->json(
+                ['message' => 'Les réservations doivent être effectuées sur un créneau de 15 minutes'],
+                Response::HTTP_BAD_REQUEST
+            );
+        }
+
+        if (!$this->isOpenAt($restaurant, $orderDate, $orderHour)) {
+            return $this->json(
+                ['message' => 'Le restaurant est fermé sur ce créneau'],
+                Response::HTTP_BAD_REQUEST
+            );
+        }
+
+        $alreadyReserved = $this->bookingRepository->getTotalGuestsForSlot(
+            $restaurant,
+            $orderDate,
+            $orderHour,
+            $booking
+        );
+
+        if ($alreadyReserved + $guestNumber > $restaurant->getMaxGuest()) {
+            return $this->json(
+                [
+                    'message' => 'Le restaurant est complet pour ce créneau',
+                    'capacity' => $restaurant->getMaxGuest(),
+                    'alreadyReserved' => $alreadyReserved,
+                    'requested' => $guestNumber,
+                ],
+                Response::HTTP_CONFLICT
+            );
+        }
+
+        $booking
+            ->setGuestNumber($guestNumber)
+            ->setOrderDate($orderDate)
+            ->setOrderHour($orderHour)
+            ->setRestaurant($restaurant)
+            ->setUpdatedAt(new DateTime());
+
+        if (array_key_exists('allergy', $data)) {
+            $allergy = trim((string) ($data['allergy'] ?? ''));
+            $booking->setAllergy($allergy === '' ? null : $allergy);
+        }
+
+        $this->manager->flush();
+
         return $this->json([
-            'id' => $booking->getId(),
-            'date' => $booking->getOrderDate()->format('Y-m-d'),
-            'hour' => $booking->getOrderHour()->format('H:i'),
-            'guestNumber' => $booking->getGuestNumber(),
-            'allergy' => $booking->getAllergy(),
-            'restaurantId' => $booking->getRestaurant()->getId(),
+            'message' => 'Réservation modifiée avec succès',
+            'booking' => $this->serializeBooking($booking),
         ]);
     }
 
@@ -589,8 +833,7 @@ class BookingController extends AbstractController
             );
         }
 
-        // Un utilisateur ne peut supprimer que ses propres réservations.
-        if ($booking->getClient() !== $user) {
+        if (!$this->canManageBooking($booking, $user)) {
             return $this->json(
                 ['message' => 'Accès interdit'],
                 Response::HTTP_FORBIDDEN
@@ -603,5 +846,54 @@ class BookingController extends AbstractController
         return $this->json(
             ['message' => 'Réservation supprimée avec succès']
         );
+    }
+
+    private function canManageBooking(Booking $booking, User $user): bool
+    {
+        return $booking->getClient() === $user
+            || in_array('ROLE_ADMIN', $user->getRoles(), true);
+    }
+
+    private function serializeBooking(Booking $booking): array
+    {
+        return [
+            'id' => $booking->getId(),
+            'date' => $booking->getOrderDate()->format('Y-m-d'),
+            'hour' => $booking->getOrderHour()->format('H:i'),
+            'guestNumber' => $booking->getGuestNumber(),
+            'allergy' => $booking->getAllergy(),
+            'restaurantId' => $booking->getRestaurant()->getId(),
+            'client' => [
+                'id' => $booking->getClient()->getId(),
+                'email' => $booking->getClient()->getEmail(),
+                'firstName' => $booking->getClient()->getfirstName(),
+                'lastName' => $booking->getClient()->getlastName(),
+            ],
+        ];
+    }
+
+    private function isOpenAt(
+        Restaurant $restaurant,
+        DateTime $date,
+        DateTime $hour
+    ): bool {
+        if ((int) $date->format('N') === 1) {
+            return false;
+        }
+
+        $time = $hour->format('H:i');
+
+        foreach ([$restaurant->getAmOpeningTime(), $restaurant->getPmOpeningTime()] as $service) {
+            if (count($service) < 2) {
+                continue;
+            }
+
+            if ($time >= $service[0] && $time <= $service[1]) {
+                return true;
+            }
+        }
+
+        return $restaurant->getAmOpeningTime() === []
+            && $restaurant->getPmOpeningTime() === [];
     }
 }

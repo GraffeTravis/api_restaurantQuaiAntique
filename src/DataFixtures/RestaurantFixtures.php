@@ -23,8 +23,8 @@ class RestaurantFixtures extends Fixture implements DependentFixtureInterface
             $restaurant = (new Restaurant())
                 ->setName("Quai Antique")
                 ->setDescription("Le Quai Antique, restaurant d'exeption")
-                ->setAmOpeningTime([])
-                ->setPmOpeningTime([])
+                ->setAmOpeningTime(['12:00', '14:00'])
+                ->setPmOpeningTime(['19:00', '21:00'])
                 ->setMaxGuest(random_int(10, 50))
                 ->setCreatedAt(new DateTimeImmutable())
                 ->setOwner($owner);

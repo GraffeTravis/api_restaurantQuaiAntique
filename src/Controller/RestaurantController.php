@@ -313,7 +313,7 @@ class RestaurantController extends AbstractController
 
     /**
      * Modifier un restaurant.
-     * Seul le propriétaire peut modifier son restaurant.
+     * Seul le propriétaire ou un administrateur peut modifier son restaurant.
      */
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
     #[OA\Put(
@@ -466,7 +466,9 @@ class RestaurantController extends AbstractController
             );
         }
 
-        if ($restaurant->getOwner() !== $user) {
+        $isAdmin = in_array('ROLE_ADMIN', $user->getRoles(), true);
+
+        if ($restaurant->getOwner() !== $user && !$isAdmin) {
             return $this->json(
                 ['message' => 'Accès interdit'],
                 Response::HTTP_FORBIDDEN

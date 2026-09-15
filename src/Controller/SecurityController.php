@@ -32,7 +32,7 @@ class SecurityController extends AbstractController
             description: "Données de l'utilisateur à inscrire",
             content: new OA\JsonContent(
                 type: 'object',
-                required: ['email', 'password'],
+                required: ['email', 'password', 'firstName', 'lastName', 'guestNumber'],
                 properties: [
                     new OA\Property(
                         property: 'email',
@@ -53,6 +53,16 @@ class SecurityController extends AbstractController
                         property: 'lastName',
                         type: 'string',
                         example: 'Dupont'
+                    ),
+                    new OA\Property(
+                        property: 'guestNumber',
+                        type: 'integer',
+                        example: 4
+                    ),
+                    new OA\Property(
+                        property: 'allergy',
+                        type: 'string',
+                        example: 'Arachides'
                     ),
                 ]
             )
@@ -87,15 +97,22 @@ class SecurityController extends AbstractController
 
         $email = $data['email'] ?? null;
         $plainPassword = $data['password'] ?? null;
+        $firstName = trim((string) ($data['firstName'] ?? ''));
+        $lastName = trim((string) ($data['lastName'] ?? ''));
+        $guestNumber = $data['guestNumber'] ?? null;
 
         if (
             !is_string($email)
             || trim($email) === ''
             || !is_string($plainPassword)
             || $plainPassword === ''
+            || $firstName === ''
+            || $lastName === ''
+            || !is_numeric($guestNumber)
+            || (int) $guestNumber < 1
         ) {
             return $this->json(
-                ['message' => 'Les champs email et password sont obligatoires'],
+                ['message' => 'Les champs email, password, firstName, lastName et guestNumber sont obligatoires'],
                 Response::HTTP_BAD_REQUEST
             );
         }
@@ -125,12 +142,12 @@ class SecurityController extends AbstractController
 
         $user->setCreatedAt(new DateTimeImmutable());
 
-        if (isset($data['firstName']) && is_string($data['firstName'])) {
-            $user->setfirstName(trim($data['firstName']));
-        }
+        $user->setfirstName($firstName);
+        $user->setlastName($lastName);
+        $user->setGuestNumber((int) $guestNumber);
 
-        if (isset($data['lastName']) && is_string($data['lastName'])) {
-            $user->setlastName(trim($data['lastName']));
+        if (isset($data['allergy']) && is_string($data['allergy'])) {
+            $user->setAllergy(trim($data['allergy']));
         }
 
         $this->manager->persist($user);

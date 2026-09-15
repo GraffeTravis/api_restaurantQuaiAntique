@@ -82,6 +82,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function __construct()
     {
         $this->apiToken = bin2hex(random_bytes(20));
+        $this->uuid = Uuid::v6();
         $this->bookings = new ArrayCollection();
     }
 

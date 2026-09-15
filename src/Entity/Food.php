@@ -119,7 +119,7 @@ class Food
     {
         if (!$this->foodCategories->contains($foodCategory)) {
             $this->foodCategories->add($foodCategory);
-            $foodCategory->setFoodId($this);
+            $foodCategory->setFood($this);
         }
 
         return $this;
@@ -129,8 +129,8 @@ class Food
     {
         if ($this->foodCategories->removeElement($foodCategory)) {
             // set the owning side to null (unless already changed)
-            if ($foodCategory->getFoodId() === $this) {
-                $foodCategory->setFoodId(null);
+            if ($foodCategory->getFood() === $this) {
+                $foodCategory->setFood(null);
             }
         }
 

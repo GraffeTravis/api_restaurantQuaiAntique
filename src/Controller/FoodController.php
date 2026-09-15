@@ -437,14 +437,12 @@ class FoodController extends AbstractController
 
             $categories[] = [
                 'id' => $category->getId(),
-                'uuid' => $category->getUuid(),
                 'title' => $category->getTitle(),
             ];
         }
 
         return [
             'id' => $food->getId(),
-            'uuid' => $food->getUuid(),
             'title' => $food->getTitle(),
             'description' => $food->getDescription(),
             'price' => $food->getPrice(),
