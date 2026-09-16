@@ -46,7 +46,7 @@ class SeedProductionCommand extends Command
         $adminEmail = trim((string) (
             $input->getOption('admin-email')
             ?: $_ENV['INITIAL_ADMIN_EMAIL']
-            ?? 'contact.travisgraffe@gmail.com'
+            ?? 'admin@mail.com'
         ));
 
         if ($adminEmail === '') {
@@ -55,6 +55,16 @@ class SeedProductionCommand extends Command
         }
 
         $admin = $this->manager->getRepository(User::class)->findOneBy(['email' => $adminEmail]);
+
+        if (!$admin instanceof User) {
+            $admin = $this->findExistingAdmin();
+
+            if ($admin instanceof User) {
+                $admin->setEmail($adminEmail);
+                $admin->setUpdatedAt(new DateTimeImmutable());
+                $output->writeln(sprintf('<info>Email administrateur mis a jour : %s</info>', $adminEmail));
+            }
+        }
 
         if (!$admin instanceof User) {
             $plainPassword = (string) (
@@ -121,6 +131,19 @@ class SeedProductionCommand extends Command
         $output->writeln('<info>Initialisation production terminee.</info>');
 
         return Command::SUCCESS;
+    }
+
+    private function findExistingAdmin(): ?User
+    {
+        $users = $this->manager->getRepository(User::class)->findAll();
+
+        foreach ($users as $user) {
+            if ($user instanceof User && in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+                return $user;
+            }
+        }
+
+        return null;
     }
 
     private function seedCarte(Restaurant $restaurant, OutputInterface $output): void
