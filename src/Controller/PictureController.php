@@ -206,11 +206,21 @@ class PictureController extends AbstractController
         // Créer le slug
         $slug = strtolower($this->slugger->slug($title));
 
-        // Créer la picture
+        $imageContent = file_get_contents($imageFile->getPathname());
+        if ($imageContent === false) {
+            return $this->json(
+                ['message' => 'Impossible de lire le fichier image'],
+                Response::HTTP_BAD_REQUEST
+            );
+        }
+
+        // Créer la picture. Les uploads admin sont stockés en base pour rester
+        // disponibles sur Heroku après redémarrage ou redéploiement du dyno.
         $picture = new Picture();
         $picture->setTitle($title);
         $picture->setSlug($slug);
-        $picture->setImageFile($imageFile);
+        $picture->setImageData(base64_encode($imageContent));
+        $picture->setImageMimeType($mimeType);
         $picture->setRestaurant($restaurant);
         $picture->setCreatedAt(new DateTimeImmutable());
 

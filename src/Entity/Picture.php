@@ -27,6 +27,12 @@ class Picture
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $fileName = null;
 
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $imageData = null;
+
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $imageMimeType = null;
+
     #[Vich\UploadableField(mapping: 'restaurant_pictures', fileNameProperty: 'fileName')]
     private ?File $imageFile = null;
 
@@ -75,6 +81,28 @@ class Picture
     public function setFileName(?string $fileName): static
     {
         $this->fileName = $fileName;
+        return $this;
+    }
+
+    public function getImageData(): ?string
+    {
+        return $this->imageData;
+    }
+
+    public function setImageData(?string $imageData): static
+    {
+        $this->imageData = $imageData;
+        return $this;
+    }
+
+    public function getImageMimeType(): ?string
+    {
+        return $this->imageMimeType;
+    }
+
+    public function setImageMimeType(?string $imageMimeType): static
+    {
+        $this->imageMimeType = $imageMimeType;
         return $this;
     }
 
@@ -132,6 +160,10 @@ class Picture
      */
     public function getImageUrl(): string
     {
+        if ($this->imageData && $this->imageMimeType) {
+            return sprintf('data:%s;base64,%s', $this->imageMimeType, $this->imageData);
+        }
+
         if (!$this->fileName) {
             return '/images/placeholder.jpg';
         }
