@@ -3,6 +3,11 @@
 namespace App\Command;
 
 use App\Entity\Restaurant;
+use App\Entity\Category;
+use App\Entity\Food;
+use App\Entity\FoodCategory;
+use App\Entity\Menu;
+use App\Entity\MenuCategory;
 use App\Entity\User;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
@@ -107,10 +112,194 @@ class SeedProductionCommand extends Command
             ->setMaxGuest($maxGuest)
             ->setOwner($admin);
 
+        $this->seedCarte($restaurant, $output);
+
         $this->manager->flush();
 
         $output->writeln('<info>Initialisation production terminee.</info>');
 
         return Command::SUCCESS;
+    }
+
+    private function seedCarte(Restaurant $restaurant, OutputInterface $output): void
+    {
+        $categories = [
+            'Entrées',
+            'Plats',
+            'Desserts',
+        ];
+
+        $categoryEntities = [];
+        foreach ($categories as $title) {
+            $categoryEntities[$title] = $this->findOrCreateCategory($title);
+        }
+
+        $foods = [
+            [
+                'title' => 'Tartare de truite de Savoie',
+                'description' => 'Truite fraîche, herbes alpines, pickles maison et crème citronnée.',
+                'price' => 18,
+                'categories' => ['Entrées'],
+            ],
+            [
+                'title' => 'Velouté de champignons',
+                'description' => 'Champignons de saison, noisettes torréfiées et huile aux herbes.',
+                'price' => 14,
+                'categories' => ['Entrées'],
+            ],
+            [
+                'title' => 'Filet de féra du lac',
+                'description' => 'Poisson du lac, légumes de saison et jus beurre citron.',
+                'price' => 28,
+                'categories' => ['Plats'],
+            ],
+            [
+                'title' => 'Ravioles forestières',
+                'description' => 'Ravioles gratinées, crème aux champignons et tomme fondue.',
+                'price' => 24,
+                'categories' => ['Plats'],
+            ],
+            [
+                'title' => 'Tarte fine aux myrtilles',
+                'description' => 'Pâte croustillante, crème légère et myrtilles de montagne.',
+                'price' => 11,
+                'categories' => ['Desserts'],
+            ],
+            [
+                'title' => 'Crémeux chocolat noir',
+                'description' => 'Chocolat intense, biscuit cacao et éclats de noisettes.',
+                'price' => 12,
+                'categories' => ['Desserts'],
+            ],
+        ];
+
+        foreach ($foods as $foodData) {
+            $food = $this->findOrCreateFood($foodData['title'], $foodData['description'], $foodData['price']);
+            foreach ($foodData['categories'] as $categoryTitle) {
+                $this->linkFoodCategory($food, $categoryEntities[$categoryTitle]);
+            }
+        }
+
+        $menus = [
+            [
+                'title' => 'Menu Découverte',
+                'description' => 'Entrée, plat et dessert autour des produits de Savoie.',
+                'price' => 42,
+                'categories' => ['Entrées', 'Plats', 'Desserts'],
+            ],
+            [
+                'title' => 'Menu du Midi',
+                'description' => 'Plat du marché et dessert maison, servi du mardi au vendredi.',
+                'price' => 29,
+                'categories' => ['Plats', 'Desserts'],
+            ],
+        ];
+
+        foreach ($menus as $menuData) {
+            $menu = $this->findOrCreateMenu(
+                $menuData['title'],
+                $menuData['description'],
+                $menuData['price'],
+                $restaurant
+            );
+
+            foreach ($menuData['categories'] as $categoryTitle) {
+                $this->linkMenuCategory($menu, $categoryEntities[$categoryTitle]);
+            }
+        }
+
+        $output->writeln('<info>Carte de production initialisee.</info>');
+    }
+
+    private function findOrCreateCategory(string $title): Category
+    {
+        $category = $this->manager->getRepository(Category::class)->findOneBy(['title' => $title]);
+
+        if (!$category instanceof Category) {
+            $category = (new Category())
+                ->setTitle($title)
+                ->setCreatedAt(new DateTimeImmutable());
+
+            $this->manager->persist($category);
+        } else {
+            $category->setUpdatedAt(new DateTimeImmutable());
+        }
+
+        return $category;
+    }
+
+    private function findOrCreateFood(string $title, string $description, int $price): Food
+    {
+        $food = $this->manager->getRepository(Food::class)->findOneBy(['title' => $title]);
+
+        if (!$food instanceof Food) {
+            $food = (new Food())->setCreatedAt(new DateTimeImmutable());
+            $this->manager->persist($food);
+        } else {
+            $food->setUpdatedAt(new DateTimeImmutable());
+        }
+
+        $food
+            ->setTitle($title)
+            ->setDescription($description)
+            ->setPrice($price);
+
+        return $food;
+    }
+
+    private function findOrCreateMenu(string $title, string $description, int $price, Restaurant $restaurant): Menu
+    {
+        $menu = $this->manager->getRepository(Menu::class)->findOneBy(['title' => $title]);
+
+        if (!$menu instanceof Menu) {
+            $menu = (new Menu())->setCreatedAt(new DateTimeImmutable());
+            $this->manager->persist($menu);
+        } else {
+            $menu->setUpdatedAt(new DateTimeImmutable());
+        }
+
+        $menu
+            ->setTitle($title)
+            ->setDescription($description)
+            ->setPrice($price)
+            ->setRestaurant($restaurant);
+
+        return $menu;
+    }
+
+    private function linkFoodCategory(Food $food, Category $category): void
+    {
+        $existingLink = $this->manager->getRepository(FoodCategory::class)->findOneBy([
+            'food' => $food,
+            'category' => $category,
+        ]);
+
+        if ($existingLink instanceof FoodCategory) {
+            return;
+        }
+
+        $this->manager->persist(
+            (new FoodCategory())
+                ->setFood($food)
+                ->setCategory($category)
+        );
+    }
+
+    private function linkMenuCategory(Menu $menu, Category $category): void
+    {
+        $existingLink = $this->manager->getRepository(MenuCategory::class)->findOneBy([
+            'menu' => $menu,
+            'category' => $category,
+        ]);
+
+        if ($existingLink instanceof MenuCategory) {
+            return;
+        }
+
+        $this->manager->persist(
+            (new MenuCategory())
+                ->setMenu($menu)
+                ->setCategory($category)
+        );
     }
 }
