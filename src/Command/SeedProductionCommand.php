@@ -2,12 +2,13 @@
 
 namespace App\Command;
 
-use App\Entity\Restaurant;
 use App\Entity\Category;
 use App\Entity\Food;
 use App\Entity\FoodCategory;
 use App\Entity\Menu;
 use App\Entity\MenuCategory;
+use App\Entity\Picture;
+use App\Entity\Restaurant;
 use App\Entity\User;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
@@ -113,6 +114,7 @@ class SeedProductionCommand extends Command
             ->setOwner($admin);
 
         $this->seedCarte($restaurant, $output);
+        $this->seedGallery($restaurant, $output);
 
         $this->manager->flush();
 
@@ -301,5 +303,73 @@ class SeedProductionCommand extends Command
                 ->setMenu($menu)
                 ->setCategory($category)
         );
+    }
+
+    private function seedGallery(Restaurant $restaurant, OutputInterface $output): void
+    {
+        $pictures = [
+            [
+                'title' => 'Soupe à l oignon gratinée',
+                'slug' => 'soupe-oignon-gratinee',
+                'fileName' => 'soupe-oignon.jpg',
+            ],
+            [
+                'title' => 'Crêpes salées maison',
+                'slug' => 'crepes-salees-maison',
+                'fileName' => 'crepes-salees.jpg',
+            ],
+            [
+                'title' => 'Filet de poisson et légumes',
+                'slug' => 'filet-poisson-legumes',
+                'fileName' => 'filet-poisson.jpg',
+            ],
+            [
+                'title' => 'Poulet aux champignons',
+                'slug' => 'poulet-aux-champignons',
+                'fileName' => 'poulet-champignons.jpg',
+            ],
+            [
+                'title' => 'Ratatouille de saison',
+                'slug' => 'ratatouille-de-saison',
+                'fileName' => 'ratatouille.jpg',
+            ],
+            [
+                'title' => 'Tarte tatin',
+                'slug' => 'tarte-tatin',
+                'fileName' => 'tarte-tatin.jpg',
+            ],
+            [
+                'title' => 'Crème brûlée',
+                'slug' => 'creme-brulee',
+                'fileName' => 'creme-brulee.jpg',
+            ],
+            [
+                'title' => 'Tarte citron meringuée',
+                'slug' => 'tarte-citron-meringuee',
+                'fileName' => 'tarte-citron-meringuee.jpg',
+            ],
+        ];
+
+        foreach ($pictures as $pictureData) {
+            $picture = $this->manager->getRepository(Picture::class)->findOneBy([
+                'slug' => $pictureData['slug'],
+                'restaurant' => $restaurant,
+            ]);
+
+            if (!$picture instanceof Picture) {
+                $picture = (new Picture())->setCreatedAt(new DateTimeImmutable());
+                $this->manager->persist($picture);
+            } else {
+                $picture->setUpdatedAt(new DateTimeImmutable());
+            }
+
+            $picture
+                ->setTitle($pictureData['title'])
+                ->setSlug($pictureData['slug'])
+                ->setFileName($pictureData['fileName'])
+                ->setRestaurant($restaurant);
+        }
+
+        $output->writeln('<info>Galerie de production initialisee.</info>');
     }
 }
