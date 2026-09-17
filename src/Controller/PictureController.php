@@ -169,10 +169,34 @@ class PictureController extends AbstractController
         $title = $request->request->get('title');
         $imageFile = $request->files->get('imageFile');
 
+        if (!$imageFile && (int) $request->headers->get('Content-Length', 0) > 6 * 1024 * 1024) {
+            return $this->json(
+                ['message' => 'L\'image ne doit pas dépasser 5 Mo'],
+                Response::HTTP_REQUEST_ENTITY_TOO_LARGE
+            );
+        }
+
         if (!$title || !$imageFile) {
             return $this->json(
                 ['message' => 'Le titre et l\'image sont obligatoires'],
                 Response::HTTP_BAD_REQUEST
+            );
+        }
+
+        if (!$imageFile->isValid()) {
+            $tooLarge = in_array($imageFile->getError(), [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true);
+            return $this->json(
+                ['message' => $tooLarge
+                    ? 'L\'image ne doit pas dépasser 5 Mo'
+                    : 'Le transfert de l\'image a échoué. Veuillez réessayer.'],
+                $tooLarge ? Response::HTTP_REQUEST_ENTITY_TOO_LARGE : Response::HTTP_BAD_REQUEST
+            );
+        }
+
+        if ($imageFile->getSize() > 5 * 1024 * 1024) {
+            return $this->json(
+                ['message' => 'L\'image ne doit pas dépasser 5 Mo'],
+                Response::HTTP_REQUEST_ENTITY_TOO_LARGE
             );
         }
 
@@ -195,16 +219,8 @@ class PictureController extends AbstractController
             );
         }
 
-        // Validation de la taille (max 5MB)
-        if ($imageFile->getSize() > 5 * 1024 * 1024) {
-            return $this->json(
-                ['message' => 'L\'image ne doit pas dépasser 5MB'],
-                Response::HTTP_BAD_REQUEST
-            );
-        }
-
         // Créer le slug
-        $slug = strtolower($this->slugger->slug($title));
+        $slug = rtrim(substr(strtolower($this->slugger->slug($title)), 0, 64), '-');
 
         $imageContent = file_get_contents($imageFile->getPathname());
         if ($imageContent === false) {
