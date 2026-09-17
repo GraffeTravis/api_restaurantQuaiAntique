@@ -36,6 +36,7 @@ class CategoryController extends AbstractController
     #[OA\Get(
         summary: 'Lister les catégories',
         description: 'Récupère toutes les catégories de la carte.',
+        security: [],
         responses: [
             new OA\Response(
                 response: 200,
@@ -46,16 +47,7 @@ class CategoryController extends AbstractController
                         new OA\Property(
                             property: 'categories',
                             type: 'array',
-                            items: new OA\Items(
-                                type: 'object',
-                                properties: [
-                                    new OA\Property(property: 'id', type: 'integer', example: 1),
-                                    new OA\Property(property: 'uuid', type: 'string', example: '550e8400-e29b-41d4-a716-446655440000'),
-                                    new OA\Property(property: 'title', type: 'string', example: 'Entrées'),
-                                    new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
-                                    new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time', nullable: true),
-                                ]
-                            )
+                            items: new OA\Items(ref: '#/components/schemas/Category')
                         ),
                         new OA\Property(property: 'total', type: 'integer', example: 5),
                     ]
@@ -79,6 +71,7 @@ class CategoryController extends AbstractController
     #[Route('/{id}', name: 'show', methods: ['GET'])]
     #[OA\Get(
         summary: 'Afficher une catégorie',
+        security: [],
         parameters: [
             new OA\Parameter(
                 name: 'id',
@@ -91,11 +84,13 @@ class CategoryController extends AbstractController
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Catégorie trouvée'
+                description: 'Catégorie trouvée',
+                content: new OA\JsonContent(ref: '#/components/schemas/Category')
             ),
             new OA\Response(
                 response: 404,
-                description: 'Catégorie introuvable'
+                description: 'Catégorie introuvable',
+                content: new OA\JsonContent(ref: '#/components/schemas/ApiError')
             ),
         ]
     )]
@@ -133,10 +128,17 @@ class CategoryController extends AbstractController
             )
         ),
         responses: [
-            new OA\Response(response: 201, description: 'Catégorie créée'),
-            new OA\Response(response: 400, description: 'Données invalides'),
-            new OA\Response(response: 401, description: 'Utilisateur non authentifié'),
-            new OA\Response(response: 403, description: 'Accès interdit'),
+            new OA\Response(response: 201, description: 'Catégorie créée', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'category', ref: '#/components/schemas/Category'),
+            ])),
+            new OA\Response(response: 400, description: 'JSON ou titre invalide', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 401, description: 'Utilisateur non authentifié', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 403, description: 'Accès interdit', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 422, description: 'Validation de la catégorie échouée (message et errors)', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'errors', type: 'object'),
+            ])),
         ]
     )]
     public function create(
@@ -232,9 +234,18 @@ class CategoryController extends AbstractController
             )
         ),
         responses: [
-            new OA\Response(response: 200, description: 'Catégorie modifiée'),
-            new OA\Response(response: 400, description: 'Données invalides'),
-            new OA\Response(response: 404, description: 'Catégorie introuvable'),
+            new OA\Response(response: 200, description: 'Catégorie modifiée', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'category', ref: '#/components/schemas/Category'),
+            ])),
+            new OA\Response(response: 400, description: 'JSON ou titre invalide', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 401, description: 'Utilisateur non authentifié', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 403, description: 'Accès interdit', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 404, description: 'Catégorie introuvable', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 422, description: 'Validation de la catégorie échouée (message et errors)', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'errors', type: 'object'),
+            ])),
         ]
     )]
     public function update(
@@ -320,8 +331,10 @@ class CategoryController extends AbstractController
             ),
         ],
         responses: [
-            new OA\Response(response: 204, description: 'Catégorie supprimée'),
-            new OA\Response(response: 404, description: 'Catégorie introuvable'),
+            new OA\Response(response: 204, description: 'Catégorie supprimée (sans corps)'),
+            new OA\Response(response: 401, description: 'Utilisateur non authentifié', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 403, description: 'Accès interdit', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 404, description: 'Catégorie introuvable', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
         ]
     )]
     public function delete(

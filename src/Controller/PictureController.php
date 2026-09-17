@@ -60,13 +60,14 @@ class PictureController extends AbstractController
                             property: 'title',
                             type: 'string',
                             description: 'Titre de l\'image',
+                            maxLength: 255,
                             example: 'Salle principale'
                         ),
                         new OA\Property(
                             property: 'imageFile',
                             type: 'string',
                             format: 'binary',
-                            description: 'Fichier image (JPG, PNG, WebP - max 5MB)'
+                            description: 'Fichier image (JPG, PNG, WebP - max 5 Mo)'
                         ),
                     ]
                 )
@@ -87,7 +88,7 @@ class PictureController extends AbstractController
                                 new OA\Property(property: 'id', type: 'integer', example: 1),
                                 new OA\Property(property: 'title', type: 'string', example: 'Salle principale'),
                                 new OA\Property(property: 'slug', type: 'string', example: 'salle-principale'),
-                                new OA\Property(property: 'imageUrl', type: 'string', example: '/uploads/restaurants/salle-principale-507d.jpg'),
+                                new OA\Property(property: 'imageUrl', type: 'string', description: 'URL data de l’image ajoutée, stockée en base.', example: 'data:image/jpeg;base64,...'),
                                 new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                             ]
                         ),
@@ -104,6 +105,7 @@ class PictureController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 413, description: 'Image de plus de 5 Mo', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
             new OA\Response(
                 response: 401,
                 description: 'Utilisateur non authentifié',
@@ -267,6 +269,7 @@ class PictureController extends AbstractController
         path: '/api/restaurants/{restaurantId}/pictures',
         summary: 'Lister la galerie du restaurant',
         description: 'Récupère toutes les images de la galerie du restaurant (public)',
+        security: [],
         parameters: [
             new OA\Parameter(
                 name: 'restaurantId',
@@ -287,16 +290,7 @@ class PictureController extends AbstractController
                         new OA\Property(
                             property: 'pictures',
                             type: 'array',
-                            items: new OA\Items(
-                                type: 'object',
-                                properties: [
-                                    new OA\Property(property: 'id', type: 'integer', example: 1),
-                                    new OA\Property(property: 'title', type: 'string', example: 'Salle principale'),
-                                    new OA\Property(property: 'slug', type: 'string', example: 'salle-principale'),
-                                    new OA\Property(property: 'imageUrl', type: 'string', example: '/uploads/restaurants/salle-principale-507d.jpg'),
-                                    new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
-                                ]
-                            )
+                            items: new OA\Items(ref: '#/components/schemas/Picture')
                         ),
                         new OA\Property(property: 'total', type: 'integer', example: 5),
                     ]
@@ -350,6 +344,7 @@ class PictureController extends AbstractController
     #[OA\Get(
         path: '/api/restaurants/{restaurantId}/pictures/{id}',
         summary: 'Voir une image (public)',
+        security: [],
         parameters: [
             new OA\Parameter(
                 name: 'restaurantId',
@@ -370,20 +365,12 @@ class PictureController extends AbstractController
             new OA\Response(
                 response: 200,
                 description: 'Détails de l\'image',
-                content: new OA\JsonContent(
-                    type: 'object',
-                    properties: [
-                        new OA\Property(property: 'id', type: 'integer', example: 1),
-                        new OA\Property(property: 'title', type: 'string', example: 'Salle principale'),
-                        new OA\Property(property: 'slug', type: 'string', example: 'salle-principale'),
-                        new OA\Property(property: 'imageUrl', type: 'string', example: '/uploads/restaurants/salle-principale-507d.jpg'),
-                        new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
-                    ]
-                )
+                content: new OA\JsonContent(ref: '#/components/schemas/Picture')
             ),
             new OA\Response(
                 response: 404,
                 description: 'Image ou restaurant non trouvé',
+                content: new OA\JsonContent(ref: '#/components/schemas/ApiError')
             ),
         ]
     )]
@@ -414,7 +401,7 @@ class PictureController extends AbstractController
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
     #[OA\Put(
         path: '/api/restaurants/{restaurantId}/pictures/{id}',
-        summary: 'Modifier une image',
+        summary: 'Modifier le titre d’une image',
         description: 'Modifier le titre d\'une image (seul l\'administrateur)',
         parameters: [
             new OA\Parameter(
@@ -442,6 +429,7 @@ class PictureController extends AbstractController
                     new OA\Property(
                         property: 'title',
                         type: 'string',
+                        maxLength: 255,
                         example: 'Salle à manger rénovée'
                     ),
                 ]
@@ -451,6 +439,16 @@ class PictureController extends AbstractController
             new OA\Response(
                 response: 200,
                 description: 'Image modifiée avec succès',
+                content: new OA\JsonContent(type: 'object', properties: [
+                    new OA\Property(property: 'message', type: 'string'),
+                    new OA\Property(property: 'picture', type: 'object', properties: [
+                        new OA\Property(property: 'id', type: 'integer'),
+                        new OA\Property(property: 'title', type: 'string'),
+                        new OA\Property(property: 'slug', type: 'string'),
+                        new OA\Property(property: 'imageUrl', type: 'string'),
+                        new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
+                    ]),
+                ])
             ),
             new OA\Response(
                 response: 400,
@@ -563,6 +561,7 @@ class PictureController extends AbstractController
             new OA\Response(
                 response: 200,
                 description: 'Image supprimée avec succès',
+                content: new OA\JsonContent(ref: '#/components/schemas/MessageResponse')
             ),
             new OA\Response(
                 response: 401,

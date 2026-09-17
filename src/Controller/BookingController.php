@@ -36,7 +36,7 @@ class BookingController extends AbstractController
     #[OA\Post(
         path: '/api/bookings',
         summary: 'Créer une nouvelle réservation',
-        description: 'Créer une réservation pour un restaurant à une date et heure spécifiées',
+        description: 'Réservation authentifiée, sur un créneau d’ouverture par tranche de 15 minutes.',
         requestBody: new OA\RequestBody(
             required: true,
             description: 'Données de la réservation',
@@ -91,18 +91,7 @@ class BookingController extends AbstractController
                             type: 'string',
                             example: 'Réservation créée avec succès'
                         ),
-                        new OA\Property(
-                            property: 'booking',
-                            type: 'object',
-                            properties: [
-                                new OA\Property(property: 'id', type: 'integer', example: 42),
-                                new OA\Property(property: 'date', type: 'string', example: '2024-12-25'),
-                                new OA\Property(property: 'hour', type: 'string', example: '19:30'),
-                                new OA\Property(property: 'guestNumber', type: 'integer', example: 4),
-                                new OA\Property(property: 'allergy', type: 'string', example: 'Pas de gluten'),
-                                new OA\Property(property: 'restaurantId', type: 'integer', example: 1),
-                            ]
-                        ),
+                        new OA\Property(property: 'booking', ref: '#/components/schemas/Booking'),
                     ]
                 )
             ),
@@ -303,6 +292,29 @@ class BookingController extends AbstractController
     }
 
     #[Route('/availability', name: 'availability', methods: ['GET'])]
+    #[OA\Get(
+        summary: 'Vérifier la disponibilité d’un créneau',
+        description: 'Un créneau fermé ou hors des quarts d’heure retourne 200 avec available=false. Aucun contrôle d’accès n’est appliqué à excludeBookingId.',
+        security: [],
+        parameters: [
+            new OA\Parameter(name: 'restaurantId', in: 'query', required: false, description: '1 par défaut', schema: new OA\Schema(type: 'integer'), example: 1),
+            new OA\Parameter(name: 'date', in: 'query', required: true, schema: new OA\Schema(type: 'string', format: 'date'), example: '2026-09-25'),
+            new OA\Parameter(name: 'hour', in: 'query', required: true, schema: new OA\Schema(type: 'string', pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'), example: '19:30'),
+            new OA\Parameter(name: 'guestNumber', in: 'query', required: false, description: '1 par défaut', schema: new OA\Schema(type: 'integer', minimum: 1), example: 4),
+            new OA\Parameter(name: 'excludeBookingId', in: 'query', required: false, description: 'Réservation exclue du décompte si elle existe.', schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Disponibilité ; capacity, alreadyReserved et remaining sont absents pour un créneau fermé.', content: new OA\JsonContent(type: 'object', properties: [
+                new OA\Property(property: 'available', type: 'boolean'),
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'capacity', type: 'integer'),
+                new OA\Property(property: 'alreadyReserved', type: 'integer'),
+                new OA\Property(property: 'remaining', type: 'integer'),
+            ])),
+            new OA\Response(response: 400, description: 'Paramètres ou formats invalides', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 404, description: 'Restaurant introuvable', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+        ]
+    )]
     public function availability(Request $request): JsonResponse
     {
         $restaurantId = $request->query->get('restaurantId', '1');
@@ -378,17 +390,14 @@ class BookingController extends AbstractController
                 description: 'Liste des réservations',
                 content: new OA\JsonContent(
                     type: 'array',
-                    items: new OA\Items(
-                        type: 'object',
-                        properties: [
-                            new OA\Property(property: 'id', type: 'integer', example: 42),
-                            new OA\Property(property: 'date', type: 'string', example: '2024-12-25'),
-                            new OA\Property(property: 'hour', type: 'string', example: '19:30'),
-                            new OA\Property(property: 'guestNumber', type: 'integer', example: 4),
-                            new OA\Property(property: 'allergy', type: 'string', example: 'Pas de gluten', nullable: true),
-                            new OA\Property(property: 'restaurantId', type: 'integer', example: 1),
-                        ]
-                    )
+                    items: new OA\Items(type: 'object', properties: [
+                        new OA\Property(property: 'id', type: 'integer'),
+                        new OA\Property(property: 'date', type: 'string', format: 'date'),
+                        new OA\Property(property: 'hour', type: 'string'),
+                        new OA\Property(property: 'guestNumber', type: 'integer'),
+                        new OA\Property(property: 'allergy', type: 'string', nullable: true),
+                        new OA\Property(property: 'restaurantId', type: 'integer'),
+                    ])
                 )
             ),
             new OA\Response(
@@ -439,6 +448,23 @@ class BookingController extends AbstractController
     }
 
     #[Route('/admin', name: 'admin_list', methods: ['GET'])]
+    #[OA\Get(
+        summary: 'Lister les réservations (administrateur)',
+        parameters: [
+            new OA\Parameter(name: 'date', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date'), example: '2026-09-25'),
+            new OA\Parameter(name: 'restaurantId', in: 'query', required: false, schema: new OA\Schema(type: 'integer'), example: 1),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Réservations filtrées, triées par date et heure', content: new OA\JsonContent(type: 'object', properties: [
+                new OA\Property(property: 'bookings', type: 'array', items: new OA\Items(ref: '#/components/schemas/Booking')),
+                new OA\Property(property: 'total', type: 'integer'),
+            ])),
+            new OA\Response(response: 400, description: 'Date invalide', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 401, description: 'Utilisateur non authentifié (pare-feu)', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 403, description: 'Accès interdit, administrateur requis', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 404, description: 'Restaurant introuvable', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+        ]
+    )]
     public function adminList(
         Request $request,
         #[CurrentUser] ?User $user
@@ -501,7 +527,7 @@ class BookingController extends AbstractController
     #[OA\Get(
         path: '/api/bookings/{id}',
         summary: 'Récupérer les détails d\'une réservation par ID',
-        description: 'Récupère les détails d\'une réservation spécifique (accessible uniquement par le propriétaire)',
+        description: 'Accessible au client propriétaire ou à un administrateur.',
         parameters: [
             new OA\Parameter(
                 name: 'id',
@@ -516,17 +542,7 @@ class BookingController extends AbstractController
             new OA\Response(
                 response: 200,
                 description: 'Détails de la réservation',
-                content: new OA\JsonContent(
-                    type: 'object',
-                    properties: [
-                        new OA\Property(property: 'id', type: 'integer', example: 42),
-                        new OA\Property(property: 'date', type: 'string', example: '2024-12-25'),
-                        new OA\Property(property: 'hour', type: 'string', example: '19:30'),
-                        new OA\Property(property: 'guestNumber', type: 'integer', example: 4),
-                        new OA\Property(property: 'allergy', type: 'string', example: 'Pas de gluten', nullable: true),
-                        new OA\Property(property: 'restaurantId', type: 'integer', example: 1),
-                    ]
-                )
+                content: new OA\JsonContent(ref: '#/components/schemas/Booking')
             ),
             new OA\Response(
                 response: 401,
@@ -603,6 +619,36 @@ class BookingController extends AbstractController
     }
 
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
+    #[OA\Put(
+        summary: 'Modifier une réservation',
+        description: 'Le client propriétaire ou un administrateur peut modifier les champs fournis. Date et heure doivent désigner un service ouvert, par tranche de 15 minutes.',
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'), example: 42),
+        ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(type: 'object', properties: [
+            new OA\Property(property: 'restaurantId', type: 'integer', example: 1),
+            new OA\Property(property: 'date', type: 'string', format: 'date', example: '2026-09-25'),
+            new OA\Property(property: 'hour', type: 'string', example: '19:30'),
+            new OA\Property(property: 'guestNumber', type: 'integer', minimum: 1, example: 4),
+            new OA\Property(property: 'allergy', type: 'string', nullable: true),
+        ])),
+        responses: [
+            new OA\Response(response: 200, description: 'Réservation modifiée', content: new OA\JsonContent(type: 'object', properties: [
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'booking', ref: '#/components/schemas/Booking'),
+            ])),
+            new OA\Response(response: 400, description: 'JSON, créneau ou nombre de couverts invalide', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 401, description: 'Utilisateur non authentifié', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 403, description: 'Réservation d’un autre client', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 404, description: 'Réservation ou restaurant introuvable', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 409, description: 'Capacité dépassée', content: new OA\JsonContent(type: 'object', properties: [
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'capacity', type: 'integer'),
+                new OA\Property(property: 'alreadyReserved', type: 'integer'),
+                new OA\Property(property: 'requested', type: 'integer'),
+            ])),
+        ]
+    )]
     public function update(
         int $id,
         Request $request,
@@ -743,7 +789,7 @@ class BookingController extends AbstractController
     #[OA\Delete(
         path: '/api/bookings/{id}',
         summary: 'Supprimer une réservation par ID',
-        description: 'Supprime une réservation (accessible uniquement par le propriétaire)',
+        description: 'Accessible au client propriétaire ou à un administrateur.',
         parameters: [
             new OA\Parameter(
                 name: 'id',

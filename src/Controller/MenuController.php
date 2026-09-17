@@ -41,10 +41,15 @@ class MenuController extends AbstractController
     #[OA\Get(
         summary: 'Lister les menus',
         description: 'Récupère tous les menus.',
+        security: [],
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Liste des menus'
+                description: 'Liste des menus',
+                content: new OA\JsonContent(type: 'object', properties: [
+                    new OA\Property(property: 'menus', type: 'array', items: new OA\Items(ref: '#/components/schemas/Menu')),
+                    new OA\Property(property: 'total', type: 'integer'),
+                ])
             ),
         ]
     )]
@@ -64,6 +69,7 @@ class MenuController extends AbstractController
     #[Route('/{id}', name: 'show', methods: ['GET'])]
     #[OA\Get(
         summary: 'Afficher un menu',
+        security: [],
         parameters: [
             new OA\Parameter(
                 name: 'id',
@@ -74,8 +80,8 @@ class MenuController extends AbstractController
             ),
         ],
         responses: [
-            new OA\Response(response: 200, description: 'Menu trouvé'),
-            new OA\Response(response: 404, description: 'Menu introuvable'),
+            new OA\Response(response: 200, description: 'Menu trouvé', content: new OA\JsonContent(ref: '#/components/schemas/Menu')),
+            new OA\Response(response: 404, description: 'Menu introuvable', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
         ]
     )]
     public function show(int $id): JsonResponse
@@ -117,6 +123,7 @@ class MenuController extends AbstractController
                         property: 'price',
                         type: 'integer',
                         minimum: 0,
+                        maximum: 32767,
                         example: 45
                     ),
                     new OA\Property(
@@ -134,11 +141,21 @@ class MenuController extends AbstractController
             )
         ),
         responses: [
-            new OA\Response(response: 201, description: 'Menu créé'),
-            new OA\Response(response: 400, description: 'Données invalides'),
-            new OA\Response(response: 404, description: 'Restaurant ou catégorie introuvable'),
-            new OA\Response(response: 401, description: 'Utilisateur non authentifié'),
-            new OA\Response(response: 403, description: 'Accès interdit'),
+            new OA\Response(response: 201, description: 'Menu créé', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'menu', ref: '#/components/schemas/Menu'),
+            ])),
+            new OA\Response(response: 400, description: 'JSON, champs, prix ou catégories invalides', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 401, description: 'Utilisateur non authentifié', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 403, description: 'Accès interdit', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 404, description: 'Restaurant ou catégorie introuvable', content: new OA\JsonContent(type: 'object', properties: [
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'categoryId', type: 'integer', description: 'Présent si une catégorie manque.'),
+            ])),
+            new OA\Response(response: 422, description: 'Validation du menu échouée (message et errors)', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'errors', type: 'object'),
+            ])),
         ]
     )]
     public function create(
@@ -276,9 +293,9 @@ class MenuController extends AbstractController
                 type: 'object',
                 required: ['title', 'description', 'price', 'restaurantId'],
                 properties: [
-                    new OA\Property(property: 'title', type: 'string', example: 'Menu découverte'),
+                    new OA\Property(property: 'title', type: 'string', maxLength: 64, example: 'Menu découverte'),
                     new OA\Property(property: 'description', type: 'string', example: 'Nouvelle description.'),
-                    new OA\Property(property: 'price', type: 'integer', example: 48),
+                    new OA\Property(property: 'price', type: 'integer', minimum: 0, maximum: 32767, example: 48),
                     new OA\Property(property: 'restaurantId', type: 'integer', example: 1),
                     new OA\Property(
                         property: 'categoryIds',
@@ -290,8 +307,21 @@ class MenuController extends AbstractController
             )
         ),
         responses: [
-            new OA\Response(response: 200, description: 'Menu modifié'),
-            new OA\Response(response: 404, description: 'Menu, restaurant ou catégorie introuvable'),
+            new OA\Response(response: 200, description: 'Menu modifié', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'menu', ref: '#/components/schemas/Menu'),
+            ])),
+            new OA\Response(response: 400, description: 'JSON, champs, prix ou catégories invalides', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 401, description: 'Utilisateur non authentifié', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 403, description: 'Accès interdit', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 404, description: 'Menu, restaurant ou catégorie introuvable', content: new OA\JsonContent(type: 'object', properties: [
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'categoryId', type: 'integer', description: 'Présent si une catégorie manque.'),
+            ])),
+            new OA\Response(response: 422, description: 'Validation du menu échouée (message et errors)', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'errors', type: 'object'),
+            ])),
         ]
     )]
     public function update(
@@ -433,8 +463,10 @@ class MenuController extends AbstractController
             ),
         ],
         responses: [
-            new OA\Response(response: 204, description: 'Menu supprimé'),
-            new OA\Response(response: 404, description: 'Menu introuvable'),
+            new OA\Response(response: 204, description: 'Menu supprimé (sans corps)'),
+            new OA\Response(response: 401, description: 'Utilisateur non authentifié', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 403, description: 'Accès interdit', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 404, description: 'Menu introuvable', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
         ]
     )]
     public function delete(

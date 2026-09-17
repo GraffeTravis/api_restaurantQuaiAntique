@@ -37,10 +37,15 @@ class FoodController extends AbstractController
     #[Route('', name: 'list', methods: ['GET'])]
     #[OA\Get(
         summary: 'Lister les plats',
+        security: [],
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Liste des plats'
+                description: 'Liste des plats',
+                content: new OA\JsonContent(type: 'object', properties: [
+                    new OA\Property(property: 'foods', type: 'array', items: new OA\Items(ref: '#/components/schemas/Food')),
+                    new OA\Property(property: 'total', type: 'integer'),
+                ])
             ),
         ]
     )]
@@ -60,6 +65,7 @@ class FoodController extends AbstractController
     #[Route('/{id}', name: 'show', methods: ['GET'])]
     #[OA\Get(
         summary: 'Afficher un plat',
+        security: [],
         parameters: [
             new OA\Parameter(
                 name: 'id',
@@ -70,8 +76,8 @@ class FoodController extends AbstractController
             ),
         ],
         responses: [
-            new OA\Response(response: 200, description: 'Plat trouvé'),
-            new OA\Response(response: 404, description: 'Plat introuvable'),
+            new OA\Response(response: 200, description: 'Plat trouvé', content: new OA\JsonContent(ref: '#/components/schemas/Food')),
+            new OA\Response(response: 404, description: 'Plat introuvable', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
         ]
     )]
     public function show(int $id): JsonResponse
@@ -113,6 +119,7 @@ class FoodController extends AbstractController
                         property: 'price',
                         type: 'integer',
                         minimum: 0,
+                        maximum: 32767,
                         example: 18
                     ),
                     new OA\Property(
@@ -125,11 +132,18 @@ class FoodController extends AbstractController
             )
         ),
         responses: [
-            new OA\Response(response: 201, description: 'Plat créé'),
-            new OA\Response(response: 400, description: 'Données invalides'),
+            new OA\Response(response: 201, description: 'Plat créé', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'food', ref: '#/components/schemas/Food'),
+            ])),
+            new OA\Response(response: 400, description: 'JSON, champs, prix ou catégories invalides', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 401, description: 'Utilisateur non authentifié', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 403, description: 'Accès interdit', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
             new OA\Response(response: 404, description: 'Catégorie introuvable'),
-            new OA\Response(response: 401, description: 'Utilisateur non authentifié'),
-            new OA\Response(response: 403, description: 'Accès interdit'),
+            new OA\Response(response: 422, description: 'Validation du plat échouée (message et errors)', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'errors', type: 'object'),
+            ])),
         ]
     )]
     public function create(
@@ -237,9 +251,9 @@ class FoodController extends AbstractController
                 type: 'object',
                 required: ['title', 'description', 'price'],
                 properties: [
-                    new OA\Property(property: 'title', type: 'string', example: 'Tartare de truite'),
+                    new OA\Property(property: 'title', type: 'string', maxLength: 64, example: 'Tartare de truite'),
                     new OA\Property(property: 'description', type: 'string', example: 'Nouvelle description.'),
-                    new OA\Property(property: 'price', type: 'integer', example: 19),
+                    new OA\Property(property: 'price', type: 'integer', minimum: 0, maximum: 32767, example: 19),
                     new OA\Property(
                         property: 'categoryIds',
                         type: 'array',
@@ -250,8 +264,18 @@ class FoodController extends AbstractController
             )
         ),
         responses: [
-            new OA\Response(response: 200, description: 'Plat modifié'),
+            new OA\Response(response: 200, description: 'Plat modifié', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'food', ref: '#/components/schemas/Food'),
+            ])),
+            new OA\Response(response: 400, description: 'JSON, champs, prix ou catégories invalides', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 401, description: 'Utilisateur non authentifié', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 403, description: 'Accès interdit', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
             new OA\Response(response: 404, description: 'Plat ou catégorie introuvable'),
+            new OA\Response(response: 422, description: 'Validation du plat échouée (message et errors)', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'errors', type: 'object'),
+            ])),
         ]
     )]
     public function update(
@@ -359,8 +383,10 @@ class FoodController extends AbstractController
             ),
         ],
         responses: [
-            new OA\Response(response: 204, description: 'Plat supprimé'),
-            new OA\Response(response: 404, description: 'Plat introuvable'),
+            new OA\Response(response: 204, description: 'Plat supprimé (sans corps)'),
+            new OA\Response(response: 401, description: 'Utilisateur non authentifié', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 403, description: 'Accès interdit', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 404, description: 'Plat introuvable', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
         ]
     )]
     public function delete(

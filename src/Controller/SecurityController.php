@@ -27,6 +27,7 @@ class SecurityController extends AbstractController
     #[OA\Post(
         path: '/api/registration',
         summary: "Inscription d'un nouvel utilisateur",
+        security: [],
         requestBody: new OA\RequestBody(
             required: true,
             description: "Données de l'utilisateur à inscrire",
@@ -42,6 +43,7 @@ class SecurityController extends AbstractController
                     new OA\Property(
                         property: 'password',
                         type: 'string',
+                        format: 'password',
                         example: 'Mot de passe'
                     ),
                     new OA\Property(
@@ -70,15 +72,22 @@ class SecurityController extends AbstractController
         responses: [
             new OA\Response(
                 response: 201,
-                description: 'Utilisateur inscrit avec succès'
+                description: 'Utilisateur inscrit avec succès',
+                content: new OA\JsonContent(type: 'object', properties: [
+                    new OA\Property(property: 'user', type: 'string'),
+                    new OA\Property(property: 'apiToken', type: 'string'),
+                    new OA\Property(property: 'roles', type: 'array', items: new OA\Items(type: 'string')),
+                ])
             ),
             new OA\Response(
                 response: 400,
-                description: 'Données invalides'
+                description: 'JSON ou champs invalides',
+                content: new OA\JsonContent(ref: '#/components/schemas/ApiError')
             ),
             new OA\Response(
                 response: 409,
-                description: 'Adresse email déjà utilisée'
+                description: 'Adresse email déjà utilisée',
+                content: new OA\JsonContent(ref: '#/components/schemas/ApiError')
             ),
         ]
     )]
@@ -167,6 +176,7 @@ class SecurityController extends AbstractController
     #[OA\Post(
         path: '/api/login',
         summary: 'Connecter un utilisateur',
+        security: [],
         requestBody: new OA\RequestBody(
             required: true,
             description: "Données de l'utilisateur pour se connecter",
@@ -190,8 +200,14 @@ class SecurityController extends AbstractController
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Connexion réussie'
-            )
+                description: 'Connexion réussie',
+                content: new OA\JsonContent(type: 'object', properties: [
+                    new OA\Property(property: 'user', type: 'string'),
+                    new OA\Property(property: 'apiToken', type: 'string'),
+                    new OA\Property(property: 'roles', type: 'array', items: new OA\Items(type: 'string')),
+                ])
+            ),
+            new OA\Response(response: 401, description: 'Identifiants absents ou incorrects (réponse du pare-feu Symfony ou du contrôleur)'),
         ]
     )]
     public function login(#[CurrentUser] ?User $user): JsonResponse

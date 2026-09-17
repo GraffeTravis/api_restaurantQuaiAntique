@@ -34,7 +34,6 @@ class RestaurantController extends AbstractController
         path: '/api/restaurants',
         summary: 'Créer un nouveau restaurant',
         description: 'Créer un restaurant (seuls les administrateurs)',
-        security: [['bearerAuth' => []]],
         requestBody: new OA\RequestBody(
             required: true,
             description: 'Données du restaurant à créer',
@@ -250,6 +249,7 @@ class RestaurantController extends AbstractController
         path: '/api/restaurants/{id}',
         summary: 'Afficher un restaurant par ID',
         description: 'Récupère les détails d\'un restaurant spécifique',
+        security: [],
         parameters: [
             new OA\Parameter(
                 name: 'id',
@@ -319,8 +319,7 @@ class RestaurantController extends AbstractController
     #[OA\Put(
         path: '/api/restaurants/{id}',
         summary: 'Modifier un restaurant par ID',
-        description: 'Modifier les détails d\'un restaurant (seul le propriétaire peut modifier)',
-        security: [['bearerAuth' => []]],
+        description: 'Modifier les détails d\'un restaurant (propriétaire ou administrateur). Tous les champs sont facultatifs.',
         parameters: [
             new OA\Parameter(
                 name: 'id',
@@ -425,7 +424,7 @@ class RestaurantController extends AbstractController
             ),
             new OA\Response(
                 response: 403,
-                description: 'Accès interdit (propriétaire requis)',
+                description: 'Accès interdit (propriétaire ou administrateur requis)',
                 content: new OA\JsonContent(
                     type: 'object',
                     properties: [
@@ -554,7 +553,6 @@ class RestaurantController extends AbstractController
         path: '/api/restaurants/{id}',
         summary: 'Supprimer un restaurant par ID',
         description: 'Supprime un restaurant (accessible uniquement par le propriétaire ou un administrateur)',
-        security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(
                 name: 'id',
