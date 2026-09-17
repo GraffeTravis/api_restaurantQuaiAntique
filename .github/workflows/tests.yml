@@ -1,0 +1,43 @@
+name: API tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: quai_antique_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test -d quai_antique_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      APP_ENV: test
+      APP_SECRET: ci-only-secret
+      DATABASE_URL: postgresql://test:test@127.0.0.1:5432/quai_antique_test?serverVersion=18&charset=utf8
+      RUN_DB_TESTS: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: pdo_pgsql, intl, mbstring, fileinfo
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Verify PostgreSQL migrations
+        run: php bin/console doctrine:migrations:migrate --no-interaction --configuration=config/migrations_test.yaml
+      - name: Run API and schema-isolated workflow tests
+        run: php vendor/bin/phpunit
