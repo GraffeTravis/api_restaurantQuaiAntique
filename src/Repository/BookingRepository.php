@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\Booking;
 use App\Entity\Restaurant;
+use App\Service\ServiceSchedule;
 use DateTime;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -20,7 +21,7 @@ class BookingRepository extends ServiceEntityRepository
 
     /**
      * Retourne le nombre total de couverts réservés
-     * pour un restaurant, une date et une heure données.
+     * pour le service contenant l'heure demandée.
      */
     public function getTotalGuestsForSlot(
         Restaurant $restaurant,
@@ -28,14 +29,19 @@ class BookingRepository extends ServiceEntityRepository
         DateTime $hour,
         ?Booking $excludedBooking = null
     ): int {
+        $range = ServiceSchedule::rangeAt($restaurant, $hour);
+        if ($range === null) {
+            return 0;
+        }
         $queryBuilder = $this->createQueryBuilder('b')
             ->select('COALESCE(SUM(b.guestNumber), 0)')
             ->andWhere('b.restaurant = :restaurant')
             ->andWhere('b.orderDate = :date')
-            ->andWhere('b.orderHour = :hour')
+            ->andWhere('b.orderHour BETWEEN :start AND :end')
             ->setParameter('restaurant', $restaurant)
             ->setParameter('date', $date)
-            ->setParameter('hour', $hour);
+            ->setParameter('start', DateTime::createFromFormat('!H:i', $range[0]))
+            ->setParameter('end', DateTime::createFromFormat('!H:i', $range[1]));
 
         if ($excludedBooking?->getId() !== null) {
             $queryBuilder

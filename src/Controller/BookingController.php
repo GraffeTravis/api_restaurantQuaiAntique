@@ -6,6 +6,7 @@ use OpenApi\Attributes as OA;
 use App\Entity\Booking;
 use App\Entity\Restaurant;
 use App\Entity\User;
+use App\Service\ServiceSchedule;
 use App\Repository\BookingRepository;
 use App\Repository\RestaurantRepository;
 use DateTime;
@@ -185,6 +186,12 @@ class BookingController extends AbstractController
             );
         }
 
+        if (!is_int($data['restaurantId']) || $data['restaurantId'] < 1 || !is_int($data['guestNumber'])
+            || !is_string($data['date']) || !is_string($data['hour'])
+            || (isset($data['allergy']) && (!is_string($data['allergy']) || mb_strlen($data['allergy']) > 255))) {
+            return $this->json(['message' => 'Types de réservation invalides'], Response::HTTP_BAD_REQUEST);
+        }
+
         $restaurant = $this->restaurantRepository->find($data['restaurantId']);
 
         if (!$restaurant) {
@@ -194,7 +201,7 @@ class BookingController extends AbstractController
             );
         }
 
-        $guestNumber = (int) $data['guestNumber'];
+        $guestNumber = $data['guestNumber'];
 
         if ($guestNumber < 1) {
             return $this->json(
@@ -240,7 +247,7 @@ class BookingController extends AbstractController
             );
         }
 
-        if (!$this->isOpenAt($restaurant, $orderDate, $orderHour)) {
+        if (!ServiceSchedule::isFuture($orderDate, $orderHour) || !$this->isOpenAt($restaurant, $orderDate, $orderHour)) {
             return $this->json(
                 ['message' => 'Le restaurant est fermé sur ce créneau'],
                 Response::HTTP_BAD_REQUEST
@@ -294,7 +301,7 @@ class BookingController extends AbstractController
     #[Route('/availability', name: 'availability', methods: ['GET'])]
     #[OA\Get(
         summary: 'Vérifier la disponibilité d’un créneau',
-        description: 'Un créneau fermé ou hors des quarts d’heure retourne 200 avec available=false. Aucun contrôle d’accès n’est appliqué à excludeBookingId.',
+        description: 'Disponibilité du service. Exclure une réservation exige son propriétaire ou un administrateur.',
         security: [],
         parameters: [
             new OA\Parameter(name: 'restaurantId', in: 'query', required: false, description: '1 par défaut', schema: new OA\Schema(type: 'integer'), example: 1),
@@ -315,7 +322,7 @@ class BookingController extends AbstractController
             new OA\Response(response: 404, description: 'Restaurant introuvable', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
         ]
     )]
-    public function availability(Request $request): JsonResponse
+    public function availability(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         $restaurantId = $request->query->get('restaurantId', '1');
         $date = $request->query->get('date');
@@ -349,7 +356,7 @@ class BookingController extends AbstractController
             );
         }
 
-        if (((int) $orderHour->format('i')) % 15 !== 0 || !$this->isOpenAt($restaurant, $orderDate, $orderHour)) {
+        if (!ServiceSchedule::isFuture($orderDate, $orderHour) || ((int) $orderHour->format('i')) % 15 !== 0 || !$this->isOpenAt($restaurant, $orderDate, $orderHour)) {
             return $this->json([
                 'available' => false,
                 'message' => 'Créneau indisponible',
@@ -359,6 +366,12 @@ class BookingController extends AbstractController
         $excludedBooking = $excludeBookingId
             ? $this->bookingRepository->find((int) $excludeBookingId)
             : null;
+
+        if ($excludeBookingId && (!$user || !$excludedBooking
+            || !$this->canManageBooking($excludedBooking, $user)
+            || $excludedBooking->getRestaurant()->getId() !== $restaurant->getId())) {
+            return $this->json(['message' => 'Exclusion de réservation interdite'], Response::HTTP_FORBIDDEN);
+        }
 
         $alreadyReserved = $this->bookingRepository->getTotalGuestsForSlot(
             $restaurant,
@@ -688,6 +701,10 @@ class BookingController extends AbstractController
 
         $restaurant = $booking->getRestaurant();
 
+        if (array_key_exists('restaurantId', $data) && (!is_int($data['restaurantId']) || $data['restaurantId'] < 1)) {
+            return $this->json(['message' => 'Restaurant invalide'], Response::HTTP_BAD_REQUEST);
+        }
+
         if (isset($data['restaurantId'])) {
             $restaurant = $this->restaurantRepository->find((int) $data['restaurantId']);
 
@@ -697,6 +714,13 @@ class BookingController extends AbstractController
                     Response::HTTP_NOT_FOUND
                 );
             }
+        }
+
+        if ((isset($data['guestNumber']) && !is_int($data['guestNumber']))
+            || (isset($data['date']) && !is_string($data['date']))
+            || (isset($data['hour']) && !is_string($data['hour']))
+            || (isset($data['allergy']) && (!is_string($data['allergy']) || mb_strlen($data['allergy']) > 255))) {
+            return $this->json(['message' => 'Types de réservation invalides'], Response::HTTP_BAD_REQUEST);
         }
 
         $guestNumber = isset($data['guestNumber'])
@@ -736,7 +760,7 @@ class BookingController extends AbstractController
             );
         }
 
-        if (!$this->isOpenAt($restaurant, $orderDate, $orderHour)) {
+        if (!ServiceSchedule::isFuture($orderDate, $orderHour) || !$this->isOpenAt($restaurant, $orderDate, $orderHour)) {
             return $this->json(
                 ['message' => 'Le restaurant est fermé sur ce créneau'],
                 Response::HTTP_BAD_REQUEST
@@ -927,19 +951,6 @@ class BookingController extends AbstractController
             return false;
         }
 
-        $time = $hour->format('H:i');
-
-        foreach ([$restaurant->getAmOpeningTime(), $restaurant->getPmOpeningTime()] as $service) {
-            if (count($service) < 2) {
-                continue;
-            }
-
-            if ($time >= $service[0] && $time <= $service[1]) {
-                return true;
-            }
-        }
-
-        return $restaurant->getAmOpeningTime() === []
-            && $restaurant->getPmOpeningTime() === [];
+        return ServiceSchedule::rangeAt($restaurant, $hour) !== null;
     }
 }

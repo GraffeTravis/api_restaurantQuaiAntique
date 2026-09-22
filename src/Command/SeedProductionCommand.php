@@ -37,6 +37,8 @@ class SeedProductionCommand extends Command
         $this
             ->addOption('admin-email', null, InputOption::VALUE_REQUIRED, 'Email du compte administrateur')
             ->addOption('admin-password', null, InputOption::VALUE_REQUIRED, 'Mot de passe a utiliser si le compte admin doit etre cree')
+            ->addOption('admin-first-name', null, InputOption::VALUE_REQUIRED, 'Prenom du compte initial', 'Travis')
+            ->addOption('admin-last-name', null, InputOption::VALUE_REQUIRED, 'Nom du compte initial', 'Graffe')
             ->addOption('restaurant-name', null, InputOption::VALUE_REQUIRED, 'Nom du restaurant', 'Quai Antique')
             ->addOption('max-guest', null, InputOption::VALUE_REQUIRED, 'Capacite maximale du restaurant', '40');
     }
@@ -80,8 +82,8 @@ class SeedProductionCommand extends Command
 
             $admin = (new User())
                 ->setEmail($adminEmail)
-                ->setFirstName('Travis')
-                ->setLastName('Graffe')
+                ->setFirstName((string) $input->getOption('admin-first-name'))
+                ->setLastName((string) $input->getOption('admin-last-name'))
                 ->setCreatedAt(new DateTimeImmutable())
                 ->setGuestNumber(2);
 

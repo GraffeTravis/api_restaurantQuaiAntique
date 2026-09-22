@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Security\PasswordPolicy;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -123,8 +124,9 @@ class AccountController extends AbstractController
     #[OA\Put(
         summary: 'Changer mon mot de passe',
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
-            type: 'object', required: ['password'], properties: [
-                new OA\Property(property: 'password', type: 'string', format: 'password', minLength: 8),
+            type: 'object', required: ['password', 'currentPassword'], properties: [
+                new OA\Property(property: 'password', type: 'string', format: 'password', minLength: 12, maxLength: 72),
+                new OA\Property(property: 'currentPassword', type: 'string', format: 'password'),
             ]
         )),
         responses: [
@@ -154,16 +156,22 @@ class AccountController extends AbstractController
             );
         }
 
-        $plainPassword = (string) $data['password'];
+        $plainPassword = $data['password'];
 
-        if (strlen($plainPassword) < 8) {
+        if (!PasswordPolicy::isValid($plainPassword)) {
             return $this->json(
-                ['message' => 'Le mot de passe doit contenir au moins 8 caractères'],
+                ['message' => 'Le mot de passe doit contenir de 12 à 72 octets'],
                 Response::HTTP_BAD_REQUEST
             );
         }
 
+        if (!is_string($data['currentPassword'] ?? null)
+            || !$passwordHasher->isPasswordValid($user, $data['currentPassword'])) {
+            return $this->json(['message' => 'Mot de passe actuel incorrect'], Response::HTTP_FORBIDDEN);
+        }
+
         $user->setPassword($passwordHasher->hashPassword($user, $plainPassword));
+        $user->revokeApiToken();
         $user->setUpdatedAt(new DateTimeImmutable());
         $this->manager->flush();
 

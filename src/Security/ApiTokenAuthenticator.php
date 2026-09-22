@@ -23,22 +23,24 @@ class ApiTokenAuthenticator extends AbstractAuthenticator
 
     public function supports(Request $request): ?bool
     {
-        return $request->headers->has('X-AUTH-TOKEN');
+        return !in_array($request->getPathInfo(), ['/api/login', '/api/registration'], true)
+            && $request->headers->has('X-AUTH-TOKEN');
     }
 
     public function authenticate(Request $request): Passport
     {
         $apiToken = $request->headers->get('X-AUTH-TOKEN');
-        if (null === $apiToken) {
+        if (!is_string($apiToken) || !preg_match('/^[a-f0-9]{64}$/D', $apiToken)) {
             throw new CustomUserMessageAuthenticationException('No API token provided');
         }
 
-        $user = $this->repository->findOneBy(['apiToken' => $apiToken]);
-        if (null === $user) {
+        $user = $this->repository->findOneBy(['apiToken' => hash('sha256', $apiToken)]);
+        if (null === $user || $user->getApiTokenExpiresAt() === null
+            || $user->getApiTokenExpiresAt() <= new \DateTimeImmutable()) {
             throw new UserNotFoundException();
         }
 
-        return new SelfValidatingPassport(new UserBadge($user->getUserIdentifier()));
+        return new SelfValidatingPassport(new UserBadge($user->getUserIdentifier(), fn () => $user));
     }
 
     public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $firewallName): ?Response

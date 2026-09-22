@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use OpenApi\Attributes as OA;
 use App\Entity\User;
+use App\Security\PasswordPolicy;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -106,22 +107,25 @@ class SecurityController extends AbstractController
 
         $email = $data['email'] ?? null;
         $plainPassword = $data['password'] ?? null;
-        $firstName = trim((string) ($data['firstName'] ?? ''));
-        $lastName = trim((string) ($data['lastName'] ?? ''));
+        $firstName = is_string($data['firstName'] ?? null) ? trim($data['firstName']) : '';
+        $lastName = is_string($data['lastName'] ?? null) ? trim($data['lastName']) : '';
         $guestNumber = $data['guestNumber'] ?? null;
 
         if (
             !is_string($email)
-            || trim($email) === ''
-            || !is_string($plainPassword)
-            || $plainPassword === ''
+            || strlen(trim($email)) > 180
+            || !filter_var(trim($email), FILTER_VALIDATE_EMAIL)
+            || !PasswordPolicy::isValid($plainPassword)
             || $firstName === ''
+            || mb_strlen($firstName) > 64
             || $lastName === ''
-            || !is_numeric($guestNumber)
-            || (int) $guestNumber < 1
+            || mb_strlen($lastName) > 64
+            || !is_int($guestNumber)
+            || $guestNumber < 1 || $guestNumber > 32767
+            || (isset($data['allergy']) && (!is_string($data['allergy']) || mb_strlen($data['allergy']) > 255))
         ) {
             return $this->json(
-                ['message' => 'Les champs email, password, firstName, lastName et guestNumber sont obligatoires'],
+                ['message' => 'Email valide, nom et prénom de 1 à 64 caractères, convives entiers et mot de passe de 12 caractères minimum (72 octets maximum) requis.'],
                 Response::HTTP_BAD_REQUEST
             );
         }
@@ -159,13 +163,15 @@ class SecurityController extends AbstractController
             $user->setAllergy(trim($data['allergy']));
         }
 
+        $token = $user->issueApiToken();
         $this->manager->persist($user);
         $this->manager->flush();
 
         return $this->json(
             [
                 'user' => $user->getUserIdentifier(),
-                'apiToken' => $user->getApiToken(),
+                'apiToken' => $token,
+                'expiresAt' => $user->getApiTokenExpiresAt()?->format(DATE_ATOM),
                 'roles' => $user->getRoles(),
             ],
             Response::HTTP_CREATED
@@ -210,7 +216,7 @@ class SecurityController extends AbstractController
             new OA\Response(response: 401, description: 'Identifiants absents ou incorrects (réponse du pare-feu Symfony ou du contrôleur)'),
         ]
     )]
-    public function login(#[CurrentUser] ?User $user): JsonResponse
+    public function login(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if ($user === null) {
             return new JsonResponse(
@@ -219,10 +225,32 @@ class SecurityController extends AbstractController
             );
         }
 
+        $data = json_decode($request->getContent(), true);
+        $token = $user->issueApiToken(($data['rememberMe'] ?? false) === true);
+        $this->manager->flush();
+
         return $this->json([
             'user' => $user->getUserIdentifier(),
-            'apiToken' => $user->getApiToken(),
+            'apiToken' => $token,
+            'expiresAt' => $user->getApiTokenExpiresAt()?->format(DATE_ATOM),
             'roles' => $user->getRoles(),
         ]);
+    }
+
+    #[Route('/logout', name: 'logout', methods: ['POST'])]
+    #[OA\Post(
+        summary: 'Révoquer la session courante',
+        requestBody: new OA\RequestBody(required: false, content: new OA\JsonContent(type: 'object')),
+        responses: [
+            new OA\Response(response: 200, description: 'Session révoquée'),
+            new OA\Response(response: 401, description: 'Session absente ou expirée'),
+        ]
+    )]
+    public function logout(#[CurrentUser] User $user): JsonResponse
+    {
+        $user->revokeApiToken();
+        $this->manager->flush();
+
+        return $this->json(['message' => 'Session révoquée']);
     }
 }

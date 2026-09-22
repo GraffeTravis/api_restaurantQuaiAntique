@@ -5,6 +5,8 @@ namespace App\Controller;
 use OpenApi\Attributes as OA;
 use App\Entity\Restaurant;
 use App\Entity\User;
+use App\Entity\Booking;
+use App\Service\ServiceSchedule;
 use App\Repository\RestaurantRepository;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
@@ -197,12 +199,16 @@ class RestaurantController extends AbstractController
         }
 
         // Validation du nombre maximal de couverts
-        $maxGuest = (int) $data['maxGuest'];
-        if ($maxGuest < 1) {
+        $maxGuest = $data['maxGuest'];
+        if (!is_int($maxGuest) || $maxGuest < 1 || $maxGuest > 32767) {
             return $this->json(
                 ['message' => 'maxGuest doit être supérieur à 0'],
                 Response::HTTP_BAD_REQUEST
             );
+        }
+
+        if (!ServiceSchedule::valid($data['amOpeningTime'] ?? [], $data['pmOpeningTime'] ?? [])) {
+            return $this->json(['message' => 'Chaque service doit durer deux heures, sans chevauchement, ou être fermé.'], 400);
         }
 
         // Créer le restaurant
@@ -483,6 +489,16 @@ class RestaurantController extends AbstractController
             );
         }
 
+        if (!ServiceSchedule::valid(
+            $data['amOpeningTime'] ?? $restaurant->getAmOpeningTime(),
+            $data['pmOpeningTime'] ?? $restaurant->getPmOpeningTime()
+        )) {
+            return $this->json(['message' => 'Chaque service doit durer deux heures, sans chevauchement, ou être fermé.'], 400);
+        }
+        if (array_key_exists('maxGuest', $data) && (!is_int($data['maxGuest']) || $data['maxGuest'] < 1 || $data['maxGuest'] > 32767)) {
+            return $this->json(['message' => 'Capacité entière de 1 à 32767 requise'], 400);
+        }
+
         // Mettre à jour les champs fournis
         if (isset($data['name'])) {
             $name = trim($data['name']);
@@ -523,6 +539,22 @@ class RestaurantController extends AbstractController
 
         if (isset($data['pmOpeningTime']) && is_array($data['pmOpeningTime'])) {
             $restaurant->setPmOpeningTime($data['pmOpeningTime']);
+        }
+
+        $totals = [];
+        foreach ($this->manager->getRepository(Booking::class)->findBy(['restaurant' => $restaurant]) as $booking) {
+            if (!ServiceSchedule::isFuture($booking->getOrderDate(), $booking->getOrderHour())) {
+                continue;
+            }
+            $range = ServiceSchedule::rangeAt($restaurant, $booking->getOrderHour());
+            if ($range === null) {
+                return $this->json(['message' => 'Ces horaires excluent une réservation existante.'], 409);
+            }
+            $key = $booking->getOrderDate()->format('Y-m-d').' '.$range[0];
+            $totals[$key] = ($totals[$key] ?? 0) + $booking->getGuestNumber();
+            if ($totals[$key] > $restaurant->getMaxGuest()) {
+                return $this->json(['message' => 'La capacité est inférieure aux réservations existantes.'], 409);
+            }
         }
 
         $restaurant->setUpdateAt(new DateTimeImmutable());

@@ -10,11 +10,13 @@ use Doctrine\ORM\Tools\SchemaTool;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\Process\Process;
 
 class ApiWorkflowTest extends WebTestCase
 {
     private KernelBrowser $browser;
     private EntityManagerInterface $manager;
+    private array $tokens = [];
 
     protected function setUp(): void
     {
@@ -36,6 +38,7 @@ class ApiWorkflowTest extends WebTestCase
         $metadata = $this->manager->getMetadataFactory()->getAllMetadata();
         $schema->dropSchema($metadata);
         $schema->createSchema($metadata);
+        $this->manager->getConnection()->executeStatement('DROP TABLE IF EXISTS auth_rate_limits');
     }
 
     private function user(string $email, array $roles = ['ROLE_USER']): User
@@ -43,8 +46,10 @@ class ApiWorkflowTest extends WebTestCase
         $user = (new User())->setEmail($email)->setPassword('test-hash')
             ->setRoles($roles)->setfirstName('Test')->setlastName('User')
             ->setCreatedAt(new DateTimeImmutable())->setGuestNumber(2);
+        $token = $user->issueApiToken();
         $this->manager->persist($user);
         $this->manager->flush();
+        $this->tokens[$user->getId()] = $token;
 
         return $user;
     }
@@ -53,7 +58,7 @@ class ApiWorkflowTest extends WebTestCase
     {
         $restaurant = (new Restaurant())->setName('Quai Antique')->setDescription('Test')
             ->setMaxGuest($capacity)->setOwner($owner)->setCreatedAt(new DateTimeImmutable())
-            ->setAmOpeningTime(['11:00', '14:00'])->setPmOpeningTime(['18:00', '22:00']);
+            ->setAmOpeningTime(['12:00', '14:00'])->setPmOpeningTime(['19:00', '21:00']);
         $this->manager->persist($restaurant);
         $this->manager->flush();
 
@@ -64,7 +69,7 @@ class ApiWorkflowTest extends WebTestCase
     {
         $this->browser->request($method, $path, server: array_filter([
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_X_AUTH_TOKEN' => $user?->getApiToken(),
+            'HTTP_X_AUTH_TOKEN' => $user ? $this->tokens[$user->getId()] : null,
         ]), content: $data === null ? null : json_encode($data, JSON_THROW_ON_ERROR));
 
         $body = $this->browser->getResponse()->getContent();
@@ -79,7 +84,7 @@ class ApiWorkflowTest extends WebTestCase
     public function testRegistrationDoesNotGrantAdminAndAccountDeletionIsProtected(): void
     {
         $response = $this->json('POST', '/api/registration', [
-            'email' => 'client@example.test', 'password' => 'secret123', 'firstName' => 'Alice',
+            'email' => 'client@example.test', 'password' => 'a-long-secret123', 'firstName' => 'Alice',
             'lastName' => 'Martin', 'guestNumber' => 2, 'roles' => ['ROLE_ADMIN'],
         ]);
         self::assertResponseStatusCodeSame(201);
@@ -88,12 +93,14 @@ class ApiWorkflowTest extends WebTestCase
         $token = $response['apiToken'];
         $this->json('POST', '/api/login', ['username' => 'client@example.test', 'password' => 'wrong']);
         self::assertResponseStatusCodeSame(401);
-        $login = $this->json('POST', '/api/login', ['username' => 'client@example.test', 'password' => 'secret123']);
+        $login = $this->json('POST', '/api/login', ['username' => 'client@example.test', 'password' => 'a-long-secret123']);
         self::assertResponseIsSuccessful();
-        self::assertSame($token, $login['apiToken']);
+        self::assertNotSame($token, $login['apiToken']);
         $this->json('GET', '/api/account/me');
         self::assertResponseStatusCodeSame(401);
         $this->browser->request('GET', '/api/account/me', server: ['HTTP_X_AUTH_TOKEN' => $token]);
+        self::assertResponseStatusCodeSame(401);
+        $this->browser->request('GET', '/api/account/me', server: ['HTTP_X_AUTH_TOKEN' => $login['apiToken']]);
         self::assertResponseIsSuccessful();
 
         $admin = $this->user('admin@example.test', ['ROLE_ADMIN']);
@@ -102,7 +109,7 @@ class ApiWorkflowTest extends WebTestCase
         self::assertNotNull($this->manager->getRepository(User::class)->find($admin->getId()));
 
         $this->json('POST', '/api/registration', [
-            'email' => 'client@example.test', 'password' => 'secret123', 'firstName' => 'Alice',
+            'email' => 'client@example.test', 'password' => 'a-long-secret123', 'firstName' => 'Alice',
             'lastName' => 'Martin', 'guestNumber' => 2,
         ]);
         self::assertResponseStatusCodeSame(409);
@@ -150,7 +157,7 @@ class ApiWorkflowTest extends WebTestCase
 
         $this->json('POST', $path, user: $client);
         self::assertResponseStatusCodeSame(403);
-        $this->browser->request('POST', $path, ['title' => 'Vide'], server: ['HTTP_X_AUTH_TOKEN' => $admin->getApiToken()]);
+        $this->browser->request('POST', $path, ['title' => 'Vide'], server: ['HTTP_X_AUTH_TOKEN' => $this->tokens[$admin->getId()]]);
         self::assertResponseStatusCodeSame(400);
 
         $invalidFile = tempnam(sys_get_temp_dir(), 'gallery-invalid-');
@@ -158,7 +165,7 @@ class ApiWorkflowTest extends WebTestCase
             file_put_contents($invalidFile, 'not an image');
             $this->browser->request('POST', $path, ['title' => 'Invalide'], [
                 'imageFile' => new UploadedFile($invalidFile, 'photo.txt', 'text/plain', null, true),
-            ], ['HTTP_X_AUTH_TOKEN' => $admin->getApiToken()]);
+            ], ['HTTP_X_AUTH_TOKEN' => $this->tokens[$admin->getId()]]);
             self::assertResponseStatusCodeSame(400);
         } finally {
             if (is_file($invalidFile)) {
@@ -171,7 +178,7 @@ class ApiWorkflowTest extends WebTestCase
             file_put_contents($file, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/iRsAAAAASUVORK5CYII='));
             $this->browser->request('POST', $path, ['title' => 'Photo test'], [
                 'imageFile' => new UploadedFile($file, 'test.png', 'image/png', null, true),
-            ], ['HTTP_X_AUTH_TOKEN' => $admin->getApiToken()]);
+            ], ['HTTP_X_AUTH_TOKEN' => $this->tokens[$admin->getId()]]);
             self::assertResponseStatusCodeSame(201);
             $picture = json_decode($this->browser->getResponse()->getContent(), true)['picture'];
             self::assertStringStartsWith('data:image/png;base64,', $picture['imageUrl']);
@@ -195,6 +202,171 @@ class ApiWorkflowTest extends WebTestCase
                 unlink($file);
             }
         }
+    }
+
+    public function testRegistrationRejectsInvalidValuesAndLimitsAttempts(): void
+    {
+        $valid = ['email' => 'valid@example.test', 'password' => 'long-password-123', 'firstName' => 'Alice', 'lastName' => 'Test', 'guestNumber' => 2];
+        foreach ([
+            ['email' => 'invalid'], ['password' => 'x'], ['guestNumber' => 1.9],
+            ['firstName' => ['invalid']], ['allergy' => str_repeat('x', 256)],
+        ] as $invalid) {
+            $this->json('POST', '/api/registration', [...$valid, ...$invalid]);
+            self::assertResponseStatusCodeSame(400);
+        }
+        self::assertSame(0, $this->manager->getRepository(User::class)->count([]));
+        $this->json('POST', '/api/registration', $valid);
+        self::assertResponseStatusCodeSame(429);
+        self::assertNotNull($this->browser->getResponse()->headers->get('Retry-After'));
+    }
+
+    public function testTokensAreHashedRotatedExpiredAndRevoked(): void
+    {
+        $email = 'session@example.test';
+        $password = 'first-long-password';
+        $created = $this->json('POST', '/api/registration', [
+            'email' => $email, 'password' => $password, 'firstName' => 'Alice', 'lastName' => 'Test', 'guestNumber' => 2,
+        ]);
+        self::assertResponseStatusCodeSame(201);
+        $user = $this->manager->getRepository(User::class)->findOneBy(['email' => $email]);
+        self::assertSame(hash('sha256', $created['apiToken']), $user->getApiToken());
+        $this->tokens[$user->getId()] = $created['apiToken'];
+        $this->json('PUT', '/api/account/password', ['password' => 'second-long-password', 'currentPassword' => 'wrong'], $user);
+        self::assertResponseStatusCodeSame(403);
+        $this->json('PUT', '/api/account/password', ['password' => 'second-long-password', 'currentPassword' => $password], $user);
+        self::assertResponseIsSuccessful();
+        $this->json('GET', '/api/account/me', user: $user);
+        self::assertResponseStatusCodeSame(401);
+
+        $login = $this->json('POST', '/api/login', ['username' => $email, 'password' => 'second-long-password', 'rememberMe' => true]);
+        self::assertResponseIsSuccessful();
+        self::assertNotSame($created['apiToken'], $login['apiToken']);
+        self::assertGreaterThan(new DateTimeImmutable('+6 days'), new DateTimeImmutable($login['expiresAt']));
+        $this->tokens[$user->getId()] = $login['apiToken'];
+        $this->json('POST', '/api/logout', [], $user);
+        self::assertResponseIsSuccessful();
+        $this->json('GET', '/api/account/me', user: $user);
+        self::assertResponseStatusCodeSame(401);
+
+        $login = $this->json('POST', '/api/login', ['username' => $email, 'password' => 'second-long-password']);
+        self::assertLessThan(new DateTimeImmutable('+2 hours'), new DateTimeImmutable($login['expiresAt']));
+        $this->tokens[$user->getId()] = $login['apiToken'];
+        $user = $this->manager->find(User::class, $user->getId());
+        (new \ReflectionProperty(User::class, 'apiTokenExpiresAt'))->setValue($user, new DateTimeImmutable('-1 second'));
+        $this->manager->flush();
+        $this->json('GET', '/api/account/me', user: $user);
+        self::assertResponseStatusCodeSame(401);
+    }
+
+    public function testLoginAttemptsAreLimited(): void
+    {
+        for ($attempt = 0; $attempt < 20; ++$attempt) {
+            $this->json('POST', '/api/login', ['username' => 'unknown@example.test', 'password' => 'wrong']);
+            self::assertResponseStatusCodeSame(401);
+        }
+        $this->json('POST', '/api/login', ['username' => 'unknown@example.test', 'password' => 'wrong']);
+        self::assertResponseStatusCodeSame(429);
+        self::assertResponseHasHeader('Retry-After');
+    }
+
+    public function testConcurrentBookingsCannotExceedServiceCapacity(): void
+    {
+        $connection = $this->manager->getConnection();
+        if (!$connection->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform) {
+            self::markTestSkipped('Concurrency is verified against PostgreSQL.');
+        }
+        $admin = $this->user('admin@example.test', ['ROLE_ADMIN']);
+        $alice = $this->user('alice@example.test');
+        $bob = $this->user('bob@example.test');
+        $restaurant = $this->restaurant($admin);
+        $workers = [];
+        $connection->beginTransaction();
+        $connection->executeQuery('SELECT id FROM restaurant ORDER BY id FOR UPDATE')->free();
+        try {
+            foreach ([$alice, $bob] as $index => $user) {
+                $worker = new Process([PHP_BINARY, '-d', 'extension=pdo_pgsql', dirname(__DIR__).'/Support/booking_request.php']);
+                $worker->setInput(json_encode([
+                    'token' => $this->tokens[$user->getId()],
+                    'booking' => ['restaurantId' => $restaurant->getId(), 'date' => (new DateTimeImmutable('next tuesday'))->format('Y-m-d'), 'hour' => $index ? '19:15' : '19:00', 'guestNumber' => 4],
+                ], JSON_THROW_ON_ERROR));
+                $worker->start();
+                $workers[] = $worker;
+            }
+            $deadline = microtime(true) + 10;
+            do {
+                $connection->executeQuery('SELECT pg_stat_clear_snapshot()')->free();
+                $waiting = (int) $connection->fetchOne("SELECT COUNT(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query = 'SELECT id FROM restaurant ORDER BY id FOR UPDATE'");
+                if ($waiting === 2) {
+                    break;
+                }
+                usleep(100000);
+            } while (microtime(true) < $deadline);
+            self::assertSame(2, $waiting, 'Both workers must contend for the restaurant lock.');
+            foreach ($workers as $worker) {
+                self::assertTrue($worker->isRunning(), 'A booking must wait while the restaurant row is locked.');
+            }
+            $connection->commit();
+            $statuses = [];
+            foreach ($workers as $worker) {
+                self::assertSame(0, $worker->wait(), $worker->getErrorOutput());
+                $statuses[] = (int) trim($worker->getOutput());
+            }
+            sort($statuses);
+            self::assertSame([201, 409], $statuses);
+            self::assertSame(4, (int) $connection->fetchOne('SELECT SUM(guest_number) FROM booking'));
+        } finally {
+            if ($connection->isTransactionActive()) {
+                $connection->rollBack();
+            }
+            foreach ($workers as $worker) {
+                $worker->stop();
+            }
+        }
+    }
+
+    public function testCapacityIsSharedAcrossSlotsAndExclusionRequiresOwnership(): void
+    {
+        $admin = $this->user('admin@example.test', ['ROLE_ADMIN']);
+        $alice = $this->user('alice@example.test');
+        $bob = $this->user('bob@example.test');
+        $restaurant = $this->restaurant($admin);
+        $payload = ['restaurantId' => $restaurant->getId(), 'date' => (new DateTimeImmutable('next tuesday'))->format('Y-m-d'), 'hour' => '19:00', 'guestNumber' => 4];
+        $created = $this->json('POST', '/api/bookings', $payload, $alice);
+        self::assertResponseStatusCodeSame(201);
+        $id = $created['booking']['id'];
+        $this->json('POST', '/api/bookings', [...$payload, 'hour' => '19:15'], $bob);
+        self::assertResponseStatusCodeSame(409);
+        $availability = '/api/bookings/availability?'.http_build_query([...$payload, 'hour' => '19:30', 'excludeBookingId' => $id]);
+        $this->json('GET', $availability);
+        self::assertResponseStatusCodeSame(403);
+        $this->json('GET', $availability, user: $bob);
+        self::assertResponseStatusCodeSame(403);
+        $result = $this->json('GET', $availability, user: $alice);
+        self::assertTrue($result['available']);
+        $this->json('PUT', '/api/bookings/'.$id, [...$payload, 'hour' => '19:15'], $alice);
+        self::assertResponseIsSuccessful();
+        $this->json('POST', '/api/bookings', [...$payload, 'hour' => '12:00'], $bob);
+        self::assertResponseStatusCodeSame(201);
+        $this->json('PUT', '/api/restaurants/'.$restaurant->getId(), ['maxGuest' => 3], $admin);
+        self::assertResponseStatusCodeSame(409);
+    }
+
+    public function testPastDatesAndClosedOrInvalidServicesAreRejected(): void
+    {
+        $admin = $this->user('admin@example.test', ['ROLE_ADMIN']);
+        $alice = $this->user('alice@example.test');
+        $restaurant = $this->restaurant($admin);
+        $payload = ['restaurantId' => $restaurant->getId(), 'date' => '2000-01-04', 'hour' => '12:00', 'guestNumber' => 2];
+        $this->json('POST', '/api/bookings', $payload, $alice);
+        self::assertResponseStatusCodeSame(400);
+        $result = $this->json('GET', '/api/bookings/availability?'.http_build_query($payload));
+        self::assertFalse($result['available']);
+        $this->json('PUT', '/api/restaurants/'.$restaurant->getId(), ['amOpeningTime' => ['99:00', '00:00']], $admin);
+        self::assertResponseStatusCodeSame(400);
+        $this->json('PUT', '/api/restaurants/'.$restaurant->getId(), ['amOpeningTime' => [], 'pmOpeningTime' => []], $admin);
+        self::assertResponseIsSuccessful();
+        $this->json('POST', '/api/bookings', [...$payload, 'date' => (new DateTimeImmutable('next tuesday'))->format('Y-m-d'), 'hour' => '03:00'], $alice);
+        self::assertResponseStatusCodeSame(400);
     }
 
     public function testCatalogueRequiresAdminAndPersistsRelations(): void

@@ -14,6 +14,7 @@ use Symfony\Component\Uid\Uuid;
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: '`user`')]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
+#[ORM\UniqueConstraint(name: 'uniq_user_api_token', fields: ['apiToken'])]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
@@ -42,8 +43,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $updatedAt = null;
 
-    #[ORM\Column(length: 255)]
-    private ?string $apiToken;
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $apiToken = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $apiTokenExpiresAt = null;
 
     #[ORM\Column(length: 64)]
     private ?string $firstName = null;
@@ -82,7 +86,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function __construct()
     {
-        $this->apiToken = bin2hex(random_bytes(20));
         $this->uuid = Uuid::v6();
         $this->bookings = new ArrayCollection();
     }
@@ -191,11 +194,24 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->apiToken;
     }
 
-    public function setApiToken(string $apiToken): static
+    public function issueApiToken(bool $rememberMe = false): string
     {
-        $this->apiToken = $apiToken;
+        $token = bin2hex(random_bytes(32));
+        $this->apiToken = hash('sha256', $token);
+        $this->apiTokenExpiresAt = new \DateTimeImmutable($rememberMe ? '+7 days' : '+1 hour');
 
-        return $this;
+        return $token;
+    }
+
+    public function getApiTokenExpiresAt(): ?\DateTimeImmutable
+    {
+        return $this->apiTokenExpiresAt;
+    }
+
+    public function revokeApiToken(): void
+    {
+        $this->apiToken = null;
+        $this->apiTokenExpiresAt = null;
     }
 
     public function getfirstName(): ?string
