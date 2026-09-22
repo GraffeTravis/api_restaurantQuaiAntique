@@ -19,4 +19,4 @@ Branche de travail : `fix/audit-p1`.
 
 ## Déploiement
 
-Le staging Heroku est provisionné séparément, sans données de production. Le code doit encore être publié sur ce staging, puis vérifié avant toute promotion en production. La restauration d'une sauvegarde de production n'a pas été exécutée : les sauvegardes restent chez Heroku conformément à la décision du propriétaire.
+Le staging Heroku est provisionné séparément, sans données de production. Le backend est déployé sur ce staging, le dyno Basic est actif et seules des données fictives ont été initialisées. Le front Vercel doit encore être rattaché au dépôt et vérifié : le domaine actuel répond par la protection « Login – Vercel ». La restauration d'une sauvegarde de production n'a pas été exécutée : les sauvegardes restent chez Heroku conformément à la décision du propriétaire.
