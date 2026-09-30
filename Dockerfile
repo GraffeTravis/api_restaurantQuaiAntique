@@ -13,7 +13,8 @@ COPY docker/apache-ports.conf /etc/apache2/ports.conf
 COPY docker/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
 COPY docker/php.ini /usr/local/etc/php/conf.d/zz-quai-antique.ini
 COPY docker/entrypoint.sh /usr/local/bin/quai-antique-entrypoint
-RUN chmod 755 /usr/local/bin/quai-antique-entrypoint
+RUN sed -i 's/\r$//' /usr/local/bin/quai-antique-entrypoint \
+    && chmod 755 /usr/local/bin/quai-antique-entrypoint
 
 WORKDIR /var/www/html
 COPY composer.json composer.lock ./
