@@ -284,7 +284,7 @@ class ApiWorkflowTest extends WebTestCase
         $connection->executeQuery('SELECT id FROM restaurant ORDER BY id FOR UPDATE')->free();
         try {
             foreach ([$alice, $bob] as $index => $user) {
-                $worker = new Process([PHP_BINARY, '-d', 'extension=pdo_pgsql', dirname(__DIR__).'/Support/booking_request.php']);
+                $worker = new Process([PHP_BINARY, dirname(__DIR__).'/Support/booking_request.php']);
                 $worker->setInput(json_encode([
                     'token' => $this->tokens[$user->getId()],
                     'booking' => ['restaurantId' => $restaurant->getId(), 'date' => (new DateTimeImmutable('next tuesday'))->format('Y-m-d'), 'hour' => $index ? '19:15' : '19:00', 'guestNumber' => 4],
@@ -312,7 +312,13 @@ class ApiWorkflowTest extends WebTestCase
                 $statuses[] = (int) trim($worker->getOutput());
             }
             sort($statuses);
-            self::assertSame([201, 409], $statuses);
+            $workerOutput = array_map(static fn (Process $worker): string => sprintf(
+                "exit=%d stdout=%s stderr=%s",
+                $worker->getExitCode() ?? -1,
+                trim($worker->getOutput()),
+                trim($worker->getErrorOutput())
+            ), $workers);
+            self::assertSame([201, 409], $statuses, implode("\n", $workerOutput));
             self::assertSame(4, (int) $connection->fetchOne('SELECT SUM(guest_number) FROM booking'));
         } finally {
             if ($connection->isTransactionActive()) {
