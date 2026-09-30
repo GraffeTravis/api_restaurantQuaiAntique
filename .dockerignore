@@ -1,0 +1,17 @@
+.git
+.github
+.dockerignore
+.env.docker.example
+Docker.md
+compose*.yaml
+compose*.yml
+.env
+.env.*
+vendor
+var
+tests
+phpunit.xml
+.phpunit.cache
+public/uploads/restaurants/**
+*.pem
+*.key
