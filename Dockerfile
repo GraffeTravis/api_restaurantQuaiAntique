@@ -20,7 +20,8 @@ COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-scripts --prefer-dist
 
 COPY . .
-RUN composer dump-autoload --no-dev --classmap-authoritative --no-scripts \
+RUN touch .env \
+    && composer dump-autoload --no-dev --classmap-authoritative --no-scripts \
     && APP_ENV=prod APP_DEBUG=0 APP_SECRET=build-placeholder \
     DATABASE_URL='postgresql://build:build@database:5432/build?serverVersion=18&charset=utf8' \
     CORS_ALLOW_ORIGIN='^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$' LOCK_DSN=flock \
