@@ -46,4 +46,41 @@ class OpenApiContractTest extends WebTestCase
 
         self::assertGreaterThanOrEqual(37, $count);
     }
+
+    public function testAuthenticationContractDocumentsLimiterResponsesAndExactFields(): void
+    {
+        $client = self::createClient();
+        $client->request('GET', '/api/doc.json');
+        self::assertResponseIsSuccessful();
+        $document = json_decode($client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+
+        $login = $document['paths']['/api/login']['post'];
+        self::assertSame(['username', 'password'], $login['requestBody']['content']['application/json']['schema']['required']);
+        $loginProperties = $login['requestBody']['content']['application/json']['schema']['properties'];
+        self::assertSame('boolean', $loginProperties['rememberMe']['type']);
+        self::assertFalse($loginProperties['rememberMe']['default']);
+        self::assertSame(['200', '401', '429', '503'], array_map('strval', array_keys($login['responses'])));
+        $loginResponse = $login['responses']['200']['content']['application/json']['schema']['properties'];
+        self::assertSame('string', $loginResponse['apiToken']['type']);
+        self::assertSame('date-time', $loginResponse['expiresAt']['format']);
+        self::assertSame('#/components/schemas/ServiceUnavailable', $login['responses']['503']['content']['application/json']['schema']['$ref']);
+
+        $registration = $document['paths']['/api/registration']['post'];
+        $registrationProperties = $registration['requestBody']['content']['application/json']['schema']['properties'];
+        self::assertSame(12, $registrationProperties['password']['minLength']);
+        self::assertSame(72, $registrationProperties['password']['maxLength']);
+        self::assertSame(32767, $registrationProperties['guestNumber']['maximum']);
+        self::assertArrayHasKey('expiresAt', $registration['responses']['201']['content']['application/json']['schema']['properties']);
+        self::assertArrayHasKey('429', $registration['responses']);
+        self::assertArrayHasKey('503', $registration['responses']);
+
+        $passwordChange = $document['paths']['/api/account/password']['put'];
+        self::assertArrayHasKey('403', $passwordChange['responses']);
+        self::assertArrayHasKey('429', $passwordChange['responses']);
+        self::assertArrayHasKey('503', $passwordChange['responses']);
+
+        $unavailableSchema = $document['components']['schemas']['ServiceUnavailable'];
+        self::assertSame(['message', 'code'], $unavailableSchema['required']);
+        self::assertSame('string', $unavailableSchema['properties']['code']['type']);
+    }
 }

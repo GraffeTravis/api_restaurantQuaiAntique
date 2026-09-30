@@ -20,7 +20,7 @@ class SmokeTest extends WebTestCase
         $client = self::createClient();
         $client->followRedirects(false);
         $client->request('POST', '/api/login');
-
         self::assertResponseStatusCodeSame(401);
+        self::assertResponseHeaderSame('Content-Type', 'application/json');
     }
 }

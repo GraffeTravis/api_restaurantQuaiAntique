@@ -1,0 +1,20 @@
+framework:
+    rate_limiter:
+        auth_login:
+            policy: fixed_window
+            limit: 20
+            interval: '15 minutes'
+            storage_service: app.auth_rate_limiter_storage
+            lock_factory: app.auth_rate_limiter_lock_factory
+        auth_registration:
+            policy: fixed_window
+            limit: 5
+            interval: '1 hour'
+            storage_service: app.auth_rate_limiter_storage
+            lock_factory: app.auth_rate_limiter_lock_factory
+        auth_password_change:
+            policy: fixed_window
+            limit: 5
+            interval: '15 minutes'
+            storage_service: app.auth_rate_limiter_storage
+            lock_factory: app.auth_rate_limiter_lock_factory

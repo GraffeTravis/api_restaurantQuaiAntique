@@ -19,5 +19,25 @@ services:
     App\:
         resource: '../src/'
 
+    app.auth_rate_limiter_cache:
+        class: Symfony\Component\Cache\Adapter\DoctrineDbalAdapter
+        arguments:
+            - '@doctrine.dbal.default_connection'
+            - auth
+            - 0
+            - { db_table: auth_rate_limits }
+
+    app.auth_rate_limiter_storage:
+        class: Symfony\Component\RateLimiter\Storage\CacheStorage
+        arguments: ['@app.auth_rate_limiter_cache']
+
+    app.auth_rate_limiter_lock_store:
+        class: Symfony\Component\Lock\Store\DoctrineDbalPostgreSqlStore
+        arguments: ['@doctrine.dbal.default_connection']
+
+    app.auth_rate_limiter_lock_factory:
+        class: Symfony\Component\Lock\LockFactory
+        arguments: ['@app.auth_rate_limiter_lock_store']
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

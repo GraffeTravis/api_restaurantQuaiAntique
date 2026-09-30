@@ -133,6 +133,9 @@ class AccountController extends AbstractController
             new OA\Response(response: 200, description: 'Mot de passe modifié', content: new OA\JsonContent(ref: '#/components/schemas/MessageResponse')),
             new OA\Response(response: 400, description: 'Mot de passe absent ou trop court', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
             new OA\Response(response: 401, description: 'Utilisateur non authentifié', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 403, description: 'Mot de passe actuel incorrect', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 429, description: 'Trop de tentatives de changement de mot de passe', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 503, description: 'Stockage de limitation temporairement indisponible', content: new OA\JsonContent(ref: '#/components/schemas/ServiceUnavailable')),
         ]
     )]
     public function updatePassword(

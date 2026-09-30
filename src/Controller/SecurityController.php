@@ -45,26 +45,36 @@ class SecurityController extends AbstractController
                         property: 'password',
                         type: 'string',
                         format: 'password',
+                        minLength: 12,
+                        maxLength: 72,
+                        description: '12 caractères minimum et 72 octets maximum.',
                         example: 'Mot de passe'
                     ),
                     new OA\Property(
                         property: 'firstName',
                         type: 'string',
+                        minLength: 1,
+                        maxLength: 64,
                         example: 'Jean'
                     ),
                     new OA\Property(
                         property: 'lastName',
                         type: 'string',
+                        minLength: 1,
+                        maxLength: 64,
                         example: 'Dupont'
                     ),
                     new OA\Property(
                         property: 'guestNumber',
                         type: 'integer',
+                        minimum: 1,
+                        maximum: 32767,
                         example: 4
                     ),
                     new OA\Property(
                         property: 'allergy',
                         type: 'string',
+                        maxLength: 255,
                         example: 'Arachides'
                     ),
                 ]
@@ -77,6 +87,7 @@ class SecurityController extends AbstractController
                 content: new OA\JsonContent(type: 'object', properties: [
                     new OA\Property(property: 'user', type: 'string'),
                     new OA\Property(property: 'apiToken', type: 'string'),
+                    new OA\Property(property: 'expiresAt', type: 'string', format: 'date-time'),
                     new OA\Property(property: 'roles', type: 'array', items: new OA\Items(type: 'string')),
                 ])
             ),
@@ -90,6 +101,8 @@ class SecurityController extends AbstractController
                 description: 'Adresse email déjà utilisée',
                 content: new OA\JsonContent(ref: '#/components/schemas/ApiError')
             ),
+            new OA\Response(response: 429, description: 'Trop de tentatives d’inscription', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 503, description: 'Stockage de limitation temporairement indisponible', content: new OA\JsonContent(ref: '#/components/schemas/ServiceUnavailable')),
         ]
     )]
     public function register(
@@ -200,6 +213,7 @@ class SecurityController extends AbstractController
                         type: 'string',
                         example: 'Mot de passe'
                     ),
+                    new OA\Property(property: 'rememberMe', type: 'boolean', default: false, description: 'Prolonge la validité du jeton à sept jours au lieu de deux heures.'),
                 ]
             )
         ),
@@ -210,10 +224,13 @@ class SecurityController extends AbstractController
                 content: new OA\JsonContent(type: 'object', properties: [
                     new OA\Property(property: 'user', type: 'string'),
                     new OA\Property(property: 'apiToken', type: 'string'),
+                    new OA\Property(property: 'expiresAt', type: 'string', format: 'date-time'),
                     new OA\Property(property: 'roles', type: 'array', items: new OA\Items(type: 'string')),
                 ])
             ),
             new OA\Response(response: 401, description: 'Identifiants absents ou incorrects (réponse du pare-feu Symfony ou du contrôleur)'),
+            new OA\Response(response: 429, description: 'Trop de tentatives de connexion', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 503, description: 'Stockage de limitation temporairement indisponible', content: new OA\JsonContent(ref: '#/components/schemas/ServiceUnavailable')),
         ]
     )]
     public function login(Request $request, #[CurrentUser] ?User $user): JsonResponse

@@ -2,23 +2,26 @@
 
 namespace App\EventSubscriber;
 
-use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
-use Symfony\Component\Cache\Adapter\DoctrineDbalAdapter;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
-use Symfony\Component\Lock\LockFactory;
-use Symfony\Component\Lock\Store\DoctrineDbalPostgreSqlStore;
-use Symfony\Component\Lock\Store\FlockStore;
-use Symfony\Component\RateLimiter\RateLimiterFactory;
-use Symfony\Component\RateLimiter\Storage\CacheStorage;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
+use Psr\Log\LoggerInterface;
+use Throwable;
 
 final class AuthRateLimitSubscriber implements EventSubscriberInterface
 {
-    public function __construct(private Connection $connection)
-    {
+    public function __construct(
+        #[Autowire(service: 'limiter.auth_login')]
+        private RateLimiterFactoryInterface $loginLimiter,
+        #[Autowire(service: 'limiter.auth_registration')]
+        private RateLimiterFactoryInterface $registrationLimiter,
+        #[Autowire(service: 'limiter.auth_password_change')]
+        private RateLimiterFactoryInterface $passwordChangeLimiter,
+        private LoggerInterface $logger,
+    ) {
     }
 
     public static function getSubscribedEvents(): array
@@ -29,19 +32,35 @@ final class AuthRateLimitSubscriber implements EventSubscriberInterface
     public function check(RequestEvent $event): void
     {
         $request = $event->getRequest();
-        $limits = ['/api/login' => [20, '15 minutes'], '/api/registration' => [5, '1 hour'], '/api/account/password' => [5, '15 minutes']];
         $path = $request->getPathInfo();
-        if (!$event->isMainRequest() || $request->isMethodSafe() || !isset($limits[$path])) {
+        $limiter = match ($path) {
+            '/api/login' => $this->loginLimiter,
+            '/api/registration' => $this->registrationLimiter,
+            '/api/account/password' => $this->passwordChangeLimiter,
+            default => null,
+        };
+
+        if (!$event->isMainRequest() || $request->isMethodSafe() || null === $limiter) {
             return;
         }
 
-        $storage = new CacheStorage(new DoctrineDbalAdapter($this->connection, 'auth', 0, ['db_table' => 'auth_rate_limits']));
-        $store = $this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform
-            ? new DoctrineDbalPostgreSqlStore($this->connection) : new FlockStore();
-        $factory = new RateLimiterFactory([
-            'id' => $path, 'policy' => 'fixed_window', 'limit' => $limits[$path][0], 'interval' => $limits[$path][1],
-        ], $storage, new LockFactory($store));
-        $limit = $factory->create(hash('sha256', $request->getClientIp() ?? 'unknown'))->consume();
+        try {
+            $limit = $limiter->create(hash('sha256', $request->getClientIp() ?? 'unknown'))->consume();
+        } catch (Throwable $exception) {
+            $this->logger->error('Authentication rate limiter storage is unavailable.', [
+                'route' => $path,
+                'exception' => $exception,
+            ]);
+
+            $event->setResponse(new JsonResponse(
+                ['message' => 'Service temporairement indisponible.', 'code' => 'AUTH_RATE_LIMIT_UNAVAILABLE'],
+                JsonResponse::HTTP_SERVICE_UNAVAILABLE,
+                ['Retry-After' => '30', 'Cache-Control' => 'no-store']
+            ));
+
+            return;
+        }
+
         if (!$limit->isAccepted()) {
             $event->setResponse(new JsonResponse(
                 ['message' => 'Trop de tentatives. Réessayez plus tard.'], 429,

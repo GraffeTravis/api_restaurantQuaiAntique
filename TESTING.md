@@ -12,6 +12,6 @@ $env:RUN_DB_TESTS='1'
 php -d extension=pdo_sqlite vendor/bin/phpunit
 ```
 
-Sans ces variables, les tests sans base restent exécutables avec `php vendor/bin/phpunit` ; les scénarios HTTP à base de données sont ignorés explicitement.
+Sans ces variables, `php vendor/bin/phpunit` exécute aussi les tests HTTP de connexion et de limitation avec un stockage mémoire isolé : les réponses `401`, `429` et `Retry-After` sont vérifiées sans PostgreSQL. Les tests nécessitant une base sont ignorés explicitement. Une panne du stockage du rate limiter est testée comme une réponse JSON `503` journalisée.
 
-La CI utilise PostgreSQL 18 avec une base jetable `quai_antique_test`. Elle exécute d'abord les deux migrations de `migrations_prod` via `config/migrations_test.yaml`, puis toute la suite. Elle ne possède aucun identifiant de production. La vérification PostgreSQL de la migration ne peut pas être reproduite localement sans un compte PostgreSQL dédié ; SQLite valide les parcours applicatifs, pas le SQL PostgreSQL.
+La CI utilise PostgreSQL 18 avec une base jetable `quai_antique_test`. Elle exécute les migrations de `migrations_prod` via `config/migrations_test.yaml`, puis toute la suite. Elle ne possède aucun identifiant de production. SQLite valide les parcours applicatifs, pas le SQL PostgreSQL.

@@ -1,0 +1,11 @@
+framework:
+    rate_limiter:
+        auth_login:
+            storage_service: null
+            lock_factory: null
+        auth_registration:
+            storage_service: null
+            lock_factory: null
+        auth_password_change:
+            storage_service: null
+            lock_factory: null

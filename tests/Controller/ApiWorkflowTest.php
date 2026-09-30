@@ -26,6 +26,7 @@ class ApiWorkflowTest extends WebTestCase
 
         $this->browser = self::createClient();
         $this->browser->disableReboot();
+        self::getContainer()->get('cache.rate_limiter')->clear();
         $this->manager = self::getContainer()->get(EntityManagerInterface::class);
         $params = $this->manager->getConnection()->getParams();
         $safe = ($params['driver'] ?? '') === 'pdo_sqlite' && ($params['memory'] ?? false)

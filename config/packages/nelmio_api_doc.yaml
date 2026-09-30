@@ -16,6 +16,12 @@ nelmio_api_doc :
                     required: [message]
                     properties:
                         message: { type: string }
+                ServiceUnavailable:
+                    type: object
+                    required: [message, code]
+                    properties:
+                        message: { type: string, example: 'Service temporairement indisponible.' }
+                        code: { type: string, example: AUTH_RATE_LIMIT_UNAVAILABLE }
                 MessageResponse:
                     type: object
                     required: [message]
