@@ -3,7 +3,7 @@ FROM composer:2 AS composer
 FROM php:8.4-apache-bookworm
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libicu-dev libpq-dev \
+    && apt-get install -y --no-install-recommends libicu-dev libpq-dev unzip \
     && docker-php-ext-install -j"$(nproc)" intl opcache pdo_pgsql \
     && rm -rf /var/lib/apt/lists/* \
     && a2enmod rewrite headers
