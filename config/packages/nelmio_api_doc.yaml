@@ -10,6 +10,10 @@ nelmio_api_doc :
                     type : apiKey
                     name: X-AUTH-TOKEN
                     in: header
+                cookieAuth:
+                    type: apiKey
+                    name: __Host-quai_session
+                    in: cookie
             schemas:
                 ApiError:
                     type: object
@@ -107,6 +111,7 @@ nelmio_api_doc :
                         createdAt: { type: string, format: date-time }
         security:
             - X-AUTH-TOKEN: [ ]
+            - cookieAuth: [ ]
     areas: # to filter documented areas
         path_patterns:
             - ^/api(?!/doc$) # Accepts routes under /api except /api/doc

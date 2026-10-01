@@ -9,7 +9,7 @@ use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\{JsonResponse, Request, Response};
+use Symfony\Component\HttpFoundation\{Cookie, JsonResponse, Request, Response};
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Serializer\SerializerInterface;
@@ -86,7 +86,7 @@ class SecurityController extends AbstractController
                 description: 'Utilisateur inscrit avec succès',
                 content: new OA\JsonContent(type: 'object', properties: [
                     new OA\Property(property: 'user', type: 'string'),
-                    new OA\Property(property: 'apiToken', type: 'string'),
+                    new OA\Property(property: 'apiToken', type: 'string', description: 'Absent lorsque X-AUTH-SESSION vaut cookie; le jeton est alors transmis uniquement dans un cookie HttpOnly.'),
                     new OA\Property(property: 'expiresAt', type: 'string', format: 'date-time'),
                     new OA\Property(property: 'roles', type: 'array', items: new OA\Items(type: 'string')),
                 ])
@@ -180,15 +180,7 @@ class SecurityController extends AbstractController
         $this->manager->persist($user);
         $this->manager->flush();
 
-        return $this->json(
-            [
-                'user' => $user->getUserIdentifier(),
-                'apiToken' => $token,
-                'expiresAt' => $user->getApiTokenExpiresAt()?->format(DATE_ATOM),
-                'roles' => $user->getRoles(),
-            ],
-            Response::HTTP_CREATED
-        );
+        return $this->sessionResponse($request, $user, $token, Response::HTTP_CREATED);
     }
 
     #[Route('/login', name: 'login', methods: ['POST'])]
@@ -213,7 +205,7 @@ class SecurityController extends AbstractController
                         type: 'string',
                         example: 'Mot de passe'
                     ),
-                    new OA\Property(property: 'rememberMe', type: 'boolean', default: false, description: 'Prolonge la validité du jeton à sept jours au lieu de deux heures.'),
+                    new OA\Property(property: 'rememberMe', type: 'boolean', default: false, description: 'Prolonge la validité du jeton à sept jours au lieu d’une heure.'),
                 ]
             )
         ),
@@ -223,9 +215,10 @@ class SecurityController extends AbstractController
                 description: 'Connexion réussie',
                 content: new OA\JsonContent(type: 'object', properties: [
                     new OA\Property(property: 'user', type: 'string'),
-                    new OA\Property(property: 'apiToken', type: 'string'),
+                    new OA\Property(property: 'apiToken', type: 'string', description: 'Absent en mode cookie X-AUTH-SESSION: cookie.'),
                     new OA\Property(property: 'expiresAt', type: 'string', format: 'date-time'),
                     new OA\Property(property: 'roles', type: 'array', items: new OA\Items(type: 'string')),
+                    new OA\Property(property: 'authMode', type: 'string', enum: ['cookie'], description: 'Présent uniquement lorsque la session est remise dans un cookie HttpOnly.'),
                 ])
             ),
             new OA\Response(response: 401, description: 'Identifiants absents ou incorrects (réponse du pare-feu Symfony ou du contrôleur)'),
@@ -246,12 +239,7 @@ class SecurityController extends AbstractController
         $token = $user->issueApiToken(($data['rememberMe'] ?? false) === true);
         $this->manager->flush();
 
-        return $this->json([
-            'user' => $user->getUserIdentifier(),
-            'apiToken' => $token,
-            'expiresAt' => $user->getApiTokenExpiresAt()?->format(DATE_ATOM),
-            'roles' => $user->getRoles(),
-        ]);
+        return $this->sessionResponse($request, $user, $token, Response::HTTP_OK);
     }
 
     #[Route('/logout', name: 'logout', methods: ['POST'])]
@@ -263,11 +251,52 @@ class SecurityController extends AbstractController
             new OA\Response(response: 401, description: 'Session absente ou expirée'),
         ]
     )]
-    public function logout(#[CurrentUser] User $user): JsonResponse
+    public function logout(Request $request, #[CurrentUser] User $user): JsonResponse
     {
         $user->revokeApiToken();
         $this->manager->flush();
 
-        return $this->json(['message' => 'Session révoquée']);
+        $response = $this->json(['message' => 'Session révoquée']);
+        $response->headers->setCookie(Cookie::create('__Host-quai_session')->withExpires(1)->withPath('/')->withSecure(true)->withHttpOnly(true)->withSameSite(Cookie::SAMESITE_LAX));
+        $response->headers->setCookie(Cookie::create('quai_session')->withExpires(1)->withPath('/')->withSecure(false)->withHttpOnly(true)->withSameSite(Cookie::SAMESITE_LAX));
+
+        return $response;
+    }
+
+    private function sessionResponse(Request $request, User $user, string $token, int $status): JsonResponse
+    {
+        $cookieMode = $request->headers->get('X-AUTH-SESSION') === 'cookie';
+        $payload = [
+            'user' => $user->getUserIdentifier(),
+            'expiresAt' => $user->getApiTokenExpiresAt()?->format(DATE_ATOM),
+            'roles' => $user->getRoles(),
+        ];
+
+        if (!$cookieMode) {
+            $payload['apiToken'] = $token;
+            return $this->json($payload, $status);
+        }
+
+        $secure = $request->isSecure();
+        $originHost = parse_url((string) $request->headers->get('Origin'), PHP_URL_HOST);
+        $sameSite = is_string($originHost) && str_ends_with($originHost, '.vercel.app')
+            ? Cookie::SAMESITE_NONE
+            : Cookie::SAMESITE_LAX;
+        $name = $secure ? '__Host-quai_session' : 'quai_session';
+        $payload['authMode'] = 'cookie';
+        $response = $this->json($payload, $status);
+        $response->headers->setCookie(Cookie::create(
+            $name,
+            $token,
+            $user->getApiTokenExpiresAt() ?? 0,
+            '/',
+            null,
+            $secure,
+            true,
+            false,
+            $sameSite,
+        ));
+
+        return $response;
     }
 }

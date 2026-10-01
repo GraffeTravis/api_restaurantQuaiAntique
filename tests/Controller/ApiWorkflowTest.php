@@ -116,6 +116,93 @@ class ApiWorkflowTest extends WebTestCase
         self::assertResponseStatusCodeSame(409);
     }
 
+    public function testAccountUpdateRejectsValuesThatExceedDatabaseTypesAndLengths(): void
+    {
+        $user = $this->user('profile@example.test');
+
+        foreach ([
+            ['firstName' => str_repeat('a', 65)],
+            ['lastName' => str_repeat('b', 65)],
+            ['allergy' => str_repeat('c', 256)],
+            ['guestNumber' => 2.5],
+            ['guestNumber' => '2'],
+            ['guestNumber' => 32768],
+        ] as $invalidProfile) {
+            $this->json('PUT', '/api/account/me', $invalidProfile, $user);
+            self::assertResponseStatusCodeSame(400);
+        }
+
+        $this->json('PUT', '/api/account/me', ['guestNumber' => 32767, 'firstName' => str_repeat('é', 64)], $user);
+        self::assertResponseIsSuccessful();
+    }
+
+    public function testHttpOnlyCookieSessionAndOriginProtection(): void
+    {
+        $this->browser->request('POST', '/api/registration', server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_AUTH_SESSION' => 'cookie',
+        ], content: json_encode([
+            'email' => 'cookie@example.test', 'password' => 'a-long-secret123', 'firstName' => 'Cookie',
+            'lastName' => 'Client', 'guestNumber' => 2,
+        ], JSON_THROW_ON_ERROR));
+
+        self::assertResponseStatusCodeSame(201);
+        $registration = json_decode($this->browser->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertArrayNotHasKey('apiToken', $registration);
+        self::assertArrayHasKey('expiresAt', $registration);
+        $setCookie = $this->browser->getResponse()->headers->get('Set-Cookie');
+        self::assertStringContainsString('quai_session=', $setCookie);
+        self::assertStringContainsString('httponly', strtolower($setCookie));
+
+        $this->browser->request('POST', '/api/login', server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_AUTH_SESSION' => 'cookie',
+        ], content: json_encode([
+            'username' => 'cookie@example.test', 'password' => 'a-long-secret123', 'rememberMe' => true,
+        ], JSON_THROW_ON_ERROR));
+        self::assertResponseIsSuccessful();
+        $login = json_decode($this->browser->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertArrayNotHasKey('apiToken', $login);
+        self::assertSame('cookie', $login['authMode']);
+        $setCookie = $this->browser->getResponse()->headers->get('Set-Cookie');
+
+        $user = $this->manager->getRepository(User::class)->findOneBy(['email' => 'cookie@example.test']);
+        self::assertNotNull($user);
+        $token = null;
+        foreach (explode(';', $setCookie) as $part) {
+            if (str_starts_with($part, 'quai_session=')) {
+                $token = substr($part, strlen('quai_session='));
+                break;
+            }
+        }
+        self::assertIsString($token);
+
+        $this->browser->request('GET', '/api/account/me', server: ['HTTP_COOKIE' => 'quai_session='.$token]);
+        self::assertResponseIsSuccessful();
+        $this->browser->request('PUT', '/api/account/me', server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_COOKIE' => 'quai_session='.$token,
+            'HTTP_ORIGIN' => 'http://127.0.0.1:5500',
+        ], content: '{"firstName":"Origine valide"}');
+        self::assertResponseIsSuccessful();
+
+        $this->browser->request('PUT', '/api/account/me', server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_COOKIE' => 'quai_session='.$token,
+            'HTTP_ORIGIN' => 'https://attacker.example',
+        ], content: '{"firstName":"CSRF"}');
+        self::assertResponseStatusCodeSame(401);
+
+        $this->browser->request('POST', '/api/logout', server: [
+            'HTTP_COOKIE' => 'quai_session='.$token,
+            'HTTP_ORIGIN' => 'http://127.0.0.1:5500',
+        ]);
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('quai_session=deleted', $this->browser->getResponse()->headers->get('Set-Cookie'));
+        $this->browser->request('GET', '/api/account/me', server: ['HTTP_COOKIE' => 'quai_session='.$token]);
+        self::assertResponseStatusCodeSame(401);
+    }
+
     public function testBookingCapacityValidationAndOwnership(): void
     {
         $admin = $this->user('admin@example.test', ['ROLE_ADMIN']);

@@ -50,10 +50,10 @@ class AccountController extends AbstractController
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             type: 'object',
             properties: [
-                new OA\Property(property: 'firstName', type: 'string', example: 'Jean'),
-                new OA\Property(property: 'lastName', type: 'string', example: 'Dupont'),
-                new OA\Property(property: 'guestNumber', type: 'integer', minimum: 1, nullable: true, example: 4),
-                new OA\Property(property: 'allergy', type: 'string', nullable: true, example: 'Arachides'),
+                new OA\Property(property: 'firstName', type: 'string', maxLength: 64, example: 'Jean'),
+                new OA\Property(property: 'lastName', type: 'string', maxLength: 64, example: 'Dupont'),
+                new OA\Property(property: 'guestNumber', type: 'integer', minimum: 1, maximum: 32767, nullable: true, example: 4),
+                new OA\Property(property: 'allergy', type: 'string', maxLength: 255, nullable: true, example: 'Arachides'),
             ]
         )),
         responses: [
@@ -61,7 +61,7 @@ class AccountController extends AbstractController
                 new OA\Property(property: 'message', type: 'string'),
                 new OA\Property(property: 'user', ref: '#/components/schemas/AccountUser'),
             ])),
-            new OA\Response(response: 400, description: 'JSON ou nombre de convives invalide', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
+            new OA\Response(response: 400, description: 'JSON ou champ hors format ou limites', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
             new OA\Response(response: 401, description: 'Utilisateur non authentifié', content: new OA\JsonContent(ref: '#/components/schemas/ApiError')),
         ]
     )]
@@ -85,29 +85,44 @@ class AccountController extends AbstractController
             );
         }
 
-        if (isset($data['firstName']) && trim((string) $data['firstName']) !== '') {
-            $user->setfirstName(trim((string) $data['firstName']));
-        }
+        foreach (['firstName' => 64, 'lastName' => 64] as $field => $maxLength) {
+            if (!array_key_exists($field, $data)) {
+                continue;
+            }
 
-        if (isset($data['lastName']) && trim((string) $data['lastName']) !== '') {
-            $user->setlastName(trim((string) $data['lastName']));
+            if (!is_string($data[$field])) {
+                return $this->json(['message' => sprintf('%s doit être une chaîne de caractères', $field)], Response::HTTP_BAD_REQUEST);
+            }
+
+            $value = trim($data[$field]);
+            if (mb_strlen($value) > $maxLength) {
+                return $this->json(['message' => sprintf('%s ne peut pas dépasser %d caractères', $field, $maxLength)], Response::HTTP_BAD_REQUEST);
+            }
+
+            if ($value !== '') {
+                $field === 'firstName' ? $user->setfirstName($value) : $user->setlastName($value);
+            }
         }
 
         if (array_key_exists('guestNumber', $data)) {
             $guestNumber = $data['guestNumber'];
 
-            if ($guestNumber !== null && (!is_numeric($guestNumber) || (int) $guestNumber < 1)) {
-                return $this->json(
-                    ['message' => 'Le nombre de convives doit être supérieur à 0'],
-                    Response::HTTP_BAD_REQUEST
-                );
+            if ($guestNumber !== null && (!is_int($guestNumber) || $guestNumber < 1 || $guestNumber > 32767)) {
+                return $this->json(['message' => 'Le nombre de convives doit être un entier compris entre 1 et 32767'], Response::HTTP_BAD_REQUEST);
             }
 
-            $user->setGuestNumber($guestNumber === null ? null : (int) $guestNumber);
+            $user->setGuestNumber($guestNumber);
         }
 
         if (array_key_exists('allergy', $data)) {
-            $allergy = trim((string) ($data['allergy'] ?? ''));
+            if ($data['allergy'] !== null && !is_string($data['allergy'])) {
+                return $this->json(['message' => 'allergy doit être une chaîne de caractères ou null'], Response::HTTP_BAD_REQUEST);
+            }
+
+            $allergy = trim($data['allergy'] ?? '');
+            if (mb_strlen($allergy) > 255) {
+                return $this->json(['message' => 'allergy ne peut pas dépasser 255 caractères'], Response::HTTP_BAD_REQUEST);
+            }
             $user->setAllergy($allergy === '' ? null : $allergy);
         }
 

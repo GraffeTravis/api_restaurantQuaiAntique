@@ -63,6 +63,9 @@ class OpenApiContractTest extends WebTestCase
         $loginResponse = $login['responses']['200']['content']['application/json']['schema']['properties'];
         self::assertSame('string', $loginResponse['apiToken']['type']);
         self::assertSame('date-time', $loginResponse['expiresAt']['format']);
+        self::assertArrayHasKey('cookieAuth', $document['components']['securitySchemes']);
+        self::assertSame('cookie', $document['components']['securitySchemes']['cookieAuth']['in']);
+        self::assertContains('cookie', $loginResponse['authMode']['enum']);
         self::assertSame('#/components/schemas/ServiceUnavailable', $login['responses']['503']['content']['application/json']['schema']['$ref']);
 
         $registration = $document['paths']['/api/registration']['post'];
@@ -73,6 +76,15 @@ class OpenApiContractTest extends WebTestCase
         self::assertArrayHasKey('expiresAt', $registration['responses']['201']['content']['application/json']['schema']['properties']);
         self::assertArrayHasKey('429', $registration['responses']);
         self::assertArrayHasKey('503', $registration['responses']);
+
+        $accountUpdate = $document['paths']['/api/account/me']['put'];
+        $accountProperties = $accountUpdate['requestBody']['content']['application/json']['schema']['properties'];
+        self::assertSame(64, $accountProperties['firstName']['maxLength']);
+        self::assertSame(64, $accountProperties['lastName']['maxLength']);
+        self::assertSame(255, $accountProperties['allergy']['maxLength']);
+        self::assertSame(32767, $accountProperties['guestNumber']['maximum']);
+        self::assertArrayHasKey('400', $accountUpdate['responses']);
+        self::assertArrayHasKey('401', $accountUpdate['responses']);
 
         $passwordChange = $document['paths']['/api/account/password']['put'];
         self::assertArrayHasKey('403', $passwordChange['responses']);
