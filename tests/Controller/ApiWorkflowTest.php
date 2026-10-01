@@ -463,6 +463,26 @@ class ApiWorkflowTest extends WebTestCase
         self::assertResponseStatusCodeSame(400);
     }
 
+    public function testBookingAndAvailabilityRejectTheExactClosingTime(): void
+    {
+        $admin = $this->user('admin@example.test', ['ROLE_ADMIN']);
+        $alice = $this->user('alice@example.test');
+        $restaurant = $this->restaurant($admin);
+        $date = (new DateTimeImmutable('next tuesday'))->format('Y-m-d');
+        $payload = ['restaurantId' => $restaurant->getId(), 'date' => $date, 'hour' => '21:00', 'guestNumber' => 2];
+
+        $this->json('POST', '/api/bookings', $payload, $alice);
+        self::assertResponseStatusCodeSame(400);
+
+        $availability = $this->json('GET', '/api/bookings/availability?'.http_build_query($payload));
+        self::assertFalse($availability['available']);
+
+        $booking = $this->json('POST', '/api/bookings', [...$payload, 'hour' => '20:45'], $alice);
+        self::assertResponseStatusCodeSame(201);
+        $this->json('PUT', '/api/bookings/'.$booking['booking']['id'], ['hour' => '21:00'], $alice);
+        self::assertResponseStatusCodeSame(400);
+    }
+
     public function testCatalogueRequiresAdminAndPersistsRelations(): void
     {
         $admin = $this->user('admin@example.test', ['ROLE_ADMIN']);

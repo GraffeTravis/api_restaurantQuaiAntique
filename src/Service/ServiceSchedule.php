@@ -38,7 +38,7 @@ final class ServiceSchedule
             return null;
         }
         foreach ([$am, $pm] as $range) {
-            if ($range !== [] && $hour->format('H:i') >= $range[0] && $hour->format('H:i') <= $range[1]) {
+            if ($range !== [] && $hour->format('H:i') >= $range[0] && $hour->format('H:i') < $range[1]) {
                 return $range;
             }
         }

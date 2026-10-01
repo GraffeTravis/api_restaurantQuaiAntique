@@ -50,6 +50,28 @@ class BookingControllerTest extends TestCase
         ));
     }
 
+    public function testRestaurantIsClosedAtServiceClosingTime(): void
+    {
+        $controller = $this->createController();
+        $restaurant = $this->createRestaurant();
+
+        foreach (['14:00', '21:00'] as $closingTime) {
+            self::assertFalse($this->isOpenAt(
+                $controller,
+                $restaurant,
+                new DateTime('2026-09-15'),
+                new DateTime($closingTime)
+            ));
+        }
+
+        self::assertTrue($this->isOpenAt(
+            $controller,
+            $restaurant,
+            new DateTime('2026-09-15'),
+            new DateTime('20:45')
+        ));
+    }
+
     public function testBookingCanBeManagedByOwnerOrAdminOnly(): void
     {
         $controller = $this->createController();
