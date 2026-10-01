@@ -37,7 +37,10 @@ jobs:
           extensions: pdo_pgsql, intl, mbstring, fileinfo
           coverage: none
       - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: composer audit --locked
       - name: Verify PostgreSQL migrations
         run: php bin/console doctrine:migrations:migrate --no-interaction --configuration=config/migrations_test.yaml
       - name: Run API and schema-isolated workflow tests
         run: php vendor/bin/phpunit
+      - name: Build production API image
+        run: docker build -t quai-antique-api:${{ github.sha }} .
