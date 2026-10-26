@@ -35,11 +35,31 @@ class ApiWorkflowTest extends WebTestCase
             self::fail('Refusing to reset a database that is not in-memory SQLite or named *_test.');
         }
 
+        $connection = $this->manager->getConnection();
+        $postgres = $connection->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+        if ($postgres) {
+            // The analytics function depends on booking's row type. Reset migration-owned
+            // objects explicitly before SchemaTool recreates the tables in this test database.
+            $connection->executeStatement('DROP FUNCTION IF EXISTS capture_booking_analytics() CASCADE');
+            if ($connection->createSchemaManager()->tablesExist(['booking'])) {
+                $connection->executeStatement('DROP FUNCTION IF EXISTS project_booking_analytics(booking, boolean)');
+            }
+            $connection->executeStatement('DROP FUNCTION IF EXISTS enqueue_booking_analytics(jsonb)');
+            $connection->executeStatement('DROP TABLE IF EXISTS booking_analytics_state');
+            $connection->executeStatement('DROP SEQUENCE IF EXISTS booking_analytics_version_seq');
+        }
         $schema = new SchemaTool($this->manager);
         $metadata = $this->manager->getMetadataFactory()->getAllMetadata();
         $schema->dropSchema($metadata);
         $schema->createSchema($metadata);
         $this->manager->getConnection()->executeStatement('DROP TABLE IF EXISTS auth_rate_limits');
+        if ($postgres) {
+            self::getContainer()->get('messenger.transport.analytics')->setup();
+            $connection->executeStatement("DELETE FROM messenger_messages WHERE queue_name IN ('analytics', 'analytics_failed')");
+            foreach (explode('-- statement', file_get_contents(__DIR__.'/../../config/sql/booking_analytics.sql')) as $sql) {
+                $connection->executeStatement($sql);
+            }
+        }
     }
 
     private function user(string $email, array $roles = ['ROLE_USER']): User

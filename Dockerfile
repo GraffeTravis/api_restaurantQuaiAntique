@@ -3,8 +3,10 @@ FROM composer:2 AS composer
 FROM php:8.4-apache-bookworm
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libicu-dev libpq-dev unzip \
+    && apt-get install -y --no-install-recommends libicu-dev libpq-dev libssl-dev unzip \
     && docker-php-ext-install -j"$(nproc)" intl opcache pdo_pgsql \
+    && pecl install mongodb \
+    && docker-php-ext-enable mongodb \
     && rm -rf /var/lib/apt/lists/* \
     && a2enmod rewrite headers
 

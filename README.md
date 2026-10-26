@@ -4,6 +4,8 @@ API REST Symfony du projet Quai Antique, realisee pour l'ECF de la formation Dev
 
 Elle fournit les donnees et les actions necessaires au front-end : authentification, compte client, carte, galerie, restaurant et reservations.
 
+Le module de statistiques administrateur utilise MongoDB et un worker Messenger. Voir [installation, règles et exploitation](docs/BOOKING_STATISTICS.md).
+
 ## Stack
 
 - PHP 8.4 ou plus
@@ -12,6 +14,7 @@ Elle fournit les donnees et les actions necessaires au front-end : authentificat
 - PostgreSQL 16+ (Docker et CI utilisent PostgreSQL 18). Heroku prend actuellement en charge les versions 16, 17 et 18; verifier la version effective du service avant un deploiement ou une migration.
 - References Heroku: [versions PostgreSQL prises en charge](https://devcenter.heroku.com/articles/heroku-postgres-version-support) et [offres PostgreSQL](https://devcenter.heroku.com/articles/heroku-postgres-plans).
 - PHPUnit
+- MongoDB 8 et extension PHP `mongodb` 2.5+
 - Nelmio API Doc
 
 ## Installation locale
@@ -74,6 +77,7 @@ Ces comptes servent uniquement aux tests et demonstrations locales.
 - `PUT /api/bookings/{id}` : modifier une reservation
 - `DELETE /api/bookings/{id}` : supprimer une reservation
 - `GET /api/bookings/admin` : consulter les reservations en administrateur
+- `GET /api/admin/statistics/bookings` : statistiques des réservations, filtres de période et granularité, réservé aux administrateurs
 
 Les routes de modification des contenus sont protegees par le role administrateur.
 

@@ -7,6 +7,9 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    env(MONGODB_URI): 'mongodb://127.0.0.1:27017'
+    env(MONGODB_DATABASE): 'quai_antique_analytics'
+    env(MESSENGER_TRANSPORT_DSN): 'doctrine://default?auto_setup=false'
 
 services:
     # default configuration for services in *this* file
@@ -18,6 +21,9 @@ services:
     # this creates a service per class whose id is the fully-qualified class name
     App\:
         resource: '../src/'
+        exclude:
+            - '../src/Message/'
+            - '../src/Service/BookingStatisticsFilter.php'
 
     app.auth_rate_limiter_cache:
         class: Symfony\Component\Cache\Adapter\DoctrineDbalAdapter

@@ -17,13 +17,13 @@ services:
       - postgres_data:/var/lib/postgresql
 
   api:
-    build:
+    build: &api-build
       context: .
       dockerfile: Dockerfile
     depends_on:
       database:
         condition: service_healthy
-    environment:
+    environment: &api-environment
       APP_ENV: prod
       APP_DEBUG: "0"
       APP_SECRET: ${APP_SECRET:?Set APP_SECRET in .env.docker}
@@ -32,6 +32,8 @@ services:
       LOCK_DSN: ${LOCK_DSN:-flock}
       DEFAULT_URI: ${DEFAULT_URI:-http://localhost:8000}
       MIGRATE_ON_START: ${MIGRATE_ON_START:-0}
+      MONGODB_URI: "mongodb://${MONGO_USER:?Set MONGO_USER in .env.docker}:${MONGO_PASSWORD:?Set MONGO_PASSWORD in .env.docker}@mongodb:27017/?authSource=admin"
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-quai_antique_analytics}
     ports:
       - "${API_BIND:-127.0.0.1}:${API_PORT:-8000}:8080"
     healthcheck:
@@ -47,6 +49,37 @@ services:
     volumes:
       - restaurant_uploads:/var/www/html/public/uploads/restaurants
 
+  mongodb:
+    image: mongo:8.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:?Set MONGO_USER in .env.docker}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?Set MONGO_PASSWORD in .env.docker}
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --username \"$$MONGO_INITDB_ROOT_USERNAME\" --password \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval 'db.adminCommand({ping:1}).ok' | grep 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  analytics-worker:
+    build: *api-build
+    environment:
+      <<: *api-environment
+      MIGRATE_ON_START: "0"
+    command: ["php", "bin/console", "messenger:consume", "analytics", "--time-limit=3600", "--memory-limit=128M", "--no-interaction"]
+    depends_on:
+      database:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   postgres_data:
   restaurant_uploads:
+  mongodb_data:

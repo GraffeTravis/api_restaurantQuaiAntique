@@ -24,6 +24,7 @@ security:
             custom_authenticator: App\Security\ApiTokenAuthenticator
 
     access_control:
+        - { path: ^/api/admin/statistics, roles: ROLE_ADMIN }
         # Routes publiques
         - { path: ^/api/registration$, roles: PUBLIC_ACCESS, methods: [POST] }
         - { path: ^/api/login$, roles: PUBLIC_ACCESS, methods: [POST] }

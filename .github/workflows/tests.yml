@@ -11,6 +11,15 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     services:
+      mongodb:
+        image: mongo:8.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping:1}).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
       postgres:
         image: postgres:18
         env:
@@ -29,12 +38,15 @@ jobs:
       APP_SECRET: ci-only-secret
       DATABASE_URL: postgresql://test:test@127.0.0.1:5432/quai_antique_test?serverVersion=18&charset=utf8
       RUN_DB_TESTS: '1'
+      RUN_ANALYTICS_TESTS: '1'
+      MONGODB_URI: mongodb://127.0.0.1:27017
+      MONGODB_DATABASE: quai_analytics_test
     steps:
       - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.5'
-          extensions: pdo_pgsql, intl, mbstring, fileinfo
+          extensions: pdo_pgsql, intl, mbstring, fileinfo, mongodb-2.5.5
           coverage: none
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: composer audit --locked
